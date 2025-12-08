@@ -31,6 +31,8 @@ class Init {
             Directory_Builder_Actions::class,
             Listings_Actions::class,
             Email_Translation::class,
+            Settings_Registration::class,
+            Option_Translation::class,
         ];
     }
 }
