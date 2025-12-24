@@ -33,6 +33,10 @@ class Init {
             Email_Translation::class,
             Settings_Registration::class,
             Option_Translation::class,
+            Query_Filtering::class,
+            Listing_Count_Filter::class,
+            Search_Form_Filter::class,
+            Add_Listing_Form_Translation::class,
         ];
     }
 }
