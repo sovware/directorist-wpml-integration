@@ -200,4 +200,44 @@
         <custom-field action="copy">_listing_type</custom-field>
         <custom-field action="copy">_admin_category_select</custom-field>
     </custom-fields>
+
+    <gutenberg-blocks>
+        <gutenberg-block type="directorist/search-listing" translate="1">
+            <key>search_bar_title</key>
+            <key>search_bar_sub_title</key>
+            <key>more_filters_text</key>
+            <key>reset_filters_text</key>
+            <key>apply_filters_text</key>
+        </gutenberg-block>
+
+        <gutenberg-block type="directorist/all-listing" translate="1">
+            <key>header_title</key>
+        </gutenberg-block>
+
+        <gutenberg-block type="directorist/search-result" translate="1">
+            <key>header_title</key>
+        </gutenberg-block>
+
+        <gutenberg-block type="directorist/category" translate="1">
+            <key>header_title</key>
+        </gutenberg-block>
+
+        <gutenberg-block type="directorist/location" translate="1">
+            <key>header_title</key>
+        </gutenberg-block>
+
+        <gutenberg-block type="directorist/tag" translate="1">
+            <key>header_title</key>
+        </gutenberg-block>
+
+        <gutenberg-block type="directorist/account-button" translate="1">
+            <key>title</key>
+            <key>text</key>
+        </gutenberg-block>
+
+        <gutenberg-block type="directorist/search-modal" translate="1">
+            <key>title</key>
+            <key>text</key>
+        </gutenberg-block>
+    </gutenberg-blocks>
 </wpml-config>
