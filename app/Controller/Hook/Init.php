@@ -3,6 +3,7 @@
 namespace Directorist_WPML_Integration\Controller\Hook;
 
 use Directorist_WPML_Integration\Helper;
+use Directorist_WPML_Integration\Controller\Hook\Directory_Translation;
 
 class Init {
 	
@@ -31,12 +32,16 @@ class Init {
             Directory_Builder_Actions::class,
             Listings_Actions::class,
             Email_Translation::class,
+
             Settings_Registration::class,
             Option_Translation::class,
             Query_Filtering::class,
             Listing_Count_Filter::class,
             Search_Form_Filter::class,
             Add_Listing_Form_Translation::class,
+
+            Directory_Translation::class,
+
         ];
     }
 }
