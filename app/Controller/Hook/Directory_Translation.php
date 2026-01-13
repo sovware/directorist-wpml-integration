@@ -205,12 +205,12 @@ class Directory_Translation {
     }
 
     /**
-     * Translate directory type terms when retrieved via get_terms()
+     * Translate directory type and tag terms when retrieved via get_terms()
      * 
      * Hook: get_terms
      * Priority: 10
      * 
-     * This hook translates directory type term names when they're retrieved
+     * This hook translates directory type and tag term names when they're retrieved
      * directly via get_terms() or get_term() functions.
      * 
      * @param array|WP_Error $terms Array of term objects or WP_Error
@@ -229,24 +229,40 @@ class Directory_Translation {
             return $terms;
         }
 
-        // Check if directory type taxonomy is in the query
-        $is_directory_type = false;
+        // Check if directory type or tags taxonomy is in the query
+        $is_target_taxonomy = false;
+        $taxonomy_type = '';
+        
         if ( ! empty( $taxonomies ) && is_array( $taxonomies ) ) {
             foreach ( $taxonomies as $taxonomy ) {
+                // Check for directory type
                 if ( defined( 'ATBDP_DIRECTORY_TYPE' ) && $taxonomy === ATBDP_DIRECTORY_TYPE ) {
-                    $is_directory_type = true;
+                    $is_target_taxonomy = true;
+                    $taxonomy_type = 'directory_type';
                     break;
                 } elseif ( defined( 'ATBDP_TYPE' ) && $taxonomy === ATBDP_TYPE ) {
-                    $is_directory_type = true;
+                    $is_target_taxonomy = true;
+                    $taxonomy_type = 'directory_type';
                     break;
                 } elseif ( $taxonomy === 'atbdp_listing_types' ) {
-                    $is_directory_type = true;
+                    $is_target_taxonomy = true;
+                    $taxonomy_type = 'directory_type';
+                    break;
+                }
+                // Check for tags
+                elseif ( defined( 'ATBDP_TAGS' ) && $taxonomy === ATBDP_TAGS ) {
+                    $is_target_taxonomy = true;
+                    $taxonomy_type = 'tag';
+                    break;
+                } elseif ( $taxonomy === 'at_biz_dir-tags' ) {
+                    $is_target_taxonomy = true;
+                    $taxonomy_type = 'tag';
                     break;
                 }
             }
         }
 
-        if ( ! $is_directory_type ) {
+        if ( ! $is_target_taxonomy ) {
             return $terms;
         }
 
@@ -256,13 +272,34 @@ class Directory_Translation {
                 continue;
             }
 
+            // Double-check taxonomy from term object
+            if ( isset( $term->taxonomy ) ) {
+                if ( defined( 'ATBDP_DIRECTORY_TYPE' ) && $term->taxonomy === ATBDP_DIRECTORY_TYPE ) {
+                    $taxonomy_type = 'directory_type';
+                } elseif ( defined( 'ATBDP_TYPE' ) && $term->taxonomy === ATBDP_TYPE ) {
+                    $taxonomy_type = 'directory_type';
+                } elseif ( $term->taxonomy === 'atbdp_listing_types' ) {
+                    $taxonomy_type = 'directory_type';
+                } elseif ( defined( 'ATBDP_TAGS' ) && $term->taxonomy === ATBDP_TAGS ) {
+                    $taxonomy_type = 'tag';
+                } elseif ( $term->taxonomy === 'at_biz_dir-tags' ) {
+                    $taxonomy_type = 'tag';
+                } else {
+                    continue; // Skip if not a target taxonomy
+                }
+            }
+
             $original_name = $term->name;
             if ( empty( $original_name ) || ! is_string( $original_name ) ) {
                 continue;
             }
 
-            // Generate string name for WPML
-            $string_name = sprintf( 'directory_type_%d_name', $term->term_id );
+            // Generate string name for WPML based on taxonomy type
+            if ( $taxonomy_type === 'tag' ) {
+                $string_name = sprintf( 'tag_%d_name', $term->term_id );
+            } else {
+                $string_name = sprintf( 'directory_type_%d_name', $term->term_id );
+            }
             
             // Register string with WPML
             $this->register_wpml_string( $string_name, $original_name );
@@ -280,7 +317,7 @@ class Directory_Translation {
     }
 
     /**
-     * Translate term name for directory types in admin areas
+     * Translate term name for directory types and tags in admin areas
      * 
      * Hook: term_name
      * Priority: 10
@@ -306,20 +343,23 @@ class Directory_Translation {
             return $name;
         }
 
-        // Check if this is a directory type term
-        $is_directory_type = false;
+        // Check if this is a directory type or tag term
+        $taxonomy_type = '';
         if ( isset( $term->taxonomy ) ) {
-            if ( defined( 'ATBDP_DIRECTORY_TYPE' ) ) {
-                $is_directory_type = ( $term->taxonomy === ATBDP_DIRECTORY_TYPE );
-            } elseif ( defined( 'ATBDP_TYPE' ) ) {
-                $is_directory_type = ( $term->taxonomy === ATBDP_TYPE );
-            } else {
-                // Fallback: check by taxonomy name
-                $is_directory_type = ( $term->taxonomy === 'atbdp_listing_types' );
+            if ( defined( 'ATBDP_DIRECTORY_TYPE' ) && $term->taxonomy === ATBDP_DIRECTORY_TYPE ) {
+                $taxonomy_type = 'directory_type';
+            } elseif ( defined( 'ATBDP_TYPE' ) && $term->taxonomy === ATBDP_TYPE ) {
+                $taxonomy_type = 'directory_type';
+            } elseif ( $term->taxonomy === 'atbdp_listing_types' ) {
+                $taxonomy_type = 'directory_type';
+            } elseif ( defined( 'ATBDP_TAGS' ) && $term->taxonomy === ATBDP_TAGS ) {
+                $taxonomy_type = 'tag';
+            } elseif ( $term->taxonomy === 'at_biz_dir-tags' ) {
+                $taxonomy_type = 'tag';
             }
         }
 
-        if ( ! $is_directory_type ) {
+        if ( empty( $taxonomy_type ) ) {
             return $name;
         }
 
@@ -328,8 +368,12 @@ class Directory_Translation {
             return $name;
         }
 
-        // Generate string name for WPML
-        $string_name = sprintf( 'directory_type_%d_name', $term->term_id );
+        // Generate string name for WPML based on taxonomy type
+        if ( $taxonomy_type === 'tag' ) {
+            $string_name = sprintf( 'tag_%d_name', $term->term_id );
+        } else {
+            $string_name = sprintf( 'directory_type_%d_name', $term->term_id );
+        }
         
         // Register string with WPML
         $this->register_wpml_string( $string_name, $name );
