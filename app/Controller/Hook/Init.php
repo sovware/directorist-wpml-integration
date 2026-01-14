@@ -38,6 +38,7 @@ class Init {
             Query_Filtering::class,
             Listing_Count_Filter::class,
             Search_Form_Filter::class,
+            Search_Form_Field_Translation::class,
             Add_Listing_Form_Translation::class,
 
             Directory_Translation::class,

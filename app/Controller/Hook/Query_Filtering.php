@@ -14,11 +14,16 @@ class Query_Filtering {
         add_action( 'pre_get_posts', [ $this, 'filter_listing_queries' ], 10, 1 );
         
         // Ensure suppress_filters is false for Directorist queries
+        // This runs BEFORE the query is created, allowing WPML to filter at SQL level
         add_filter( 'directorist_all_listings_query_arguments', [ $this, 'ensure_wpml_filtering' ], 10, 1 );
         add_filter( 'directorist_dashboard_query_arguments', [ $this, 'ensure_wpml_filtering' ], 10, 1 );
         
-        // Filter DB queries before they're executed
-        add_filter( 'directorist_listings_query_results', [ $this, 'filter_query_results' ], 10, 1 );
+        // Also filter author listings query arguments (like author profile page)
+        add_filter( 'atbdp_author_listings_query_arguments', [ $this, 'ensure_wpml_filtering' ], 10, 1 );
+        
+        // Filter DB query results AFTER the query runs
+        // This is the critical filter that ensures count matches filtered results
+        add_filter( 'directorist_listings_query_results', [ $this, 'filter_query_results' ], 5, 1 );
     }
 
     /**
@@ -157,18 +162,34 @@ class Query_Filtering {
     /**
      * Ensure WPML filtering is enabled for Directorist queries
      * 
+     * This hook runs BEFORE the query is created in DB::get_listings_data().
+     * We ensure suppress_filters is false so WPML can add language filtering
+     * to the SQL query via posts_where, posts_join filters.
+     * 
      * @param array $args Query arguments
      * @return array Modified query arguments
      */
     public function ensure_wpml_filtering( $args ) {
-        // Ensure suppress_filters is false so WPML can filter
-        if ( isset( $args['suppress_filters'] ) && $args['suppress_filters'] ) {
-            $args['suppress_filters'] = false;
+        // Check if WPML is active
+        if ( ! has_filter( 'wpml_current_language' ) ) {
+            return $args;
         }
 
-        // If post_type is Directorist listing, ensure WPML filtering
+        // If post_type is Directorist listing, ensure WPML can filter
         if ( isset( $args['post_type'] ) && ATBDP_POST_TYPE === $args['post_type'] ) {
+            // Force suppress_filters to false so WPML's posts_where/join filters work
             $args['suppress_filters'] = false;
+            
+            // Translate taxonomy term IDs in tax_query to current language
+            // This ensures category/location/tag filters work correctly
+            if ( ! empty( $args['tax_query'] ) && is_array( $args['tax_query'] ) ) {
+                $args['tax_query'] = $this->translate_tax_query_terms( $args['tax_query'] );
+            }
+        } else {
+            // For other post types, just ensure suppress_filters is false if it was true
+            if ( isset( $args['suppress_filters'] ) && $args['suppress_filters'] ) {
+                $args['suppress_filters'] = false;
+            }
         }
 
         return $args;
@@ -177,11 +198,28 @@ class Query_Filtering {
     /**
      * Filter query results to ensure only current language listings
      * 
+     * This is a safety net filter. WPML should already filter at SQL level
+     * when suppress_filters is false, but we double-check here for edge cases.
+     * 
      * @param object $results Query results object
      * @return object Filtered results
      */
     public function filter_query_results( $results ) {
-        if ( empty( $results->ids ) || ! is_array( $results->ids ) ) {
+        // Validate results object
+        if ( ! is_object( $results ) ) {
+            return $results;
+        }
+
+        // Ensure ids is an array
+        if ( ! isset( $results->ids ) || ! is_array( $results->ids ) ) {
+            $results->ids = [];
+        }
+
+        // If no IDs, set total to 0 and return early
+        if ( empty( $results->ids ) ) {
+            $results->ids = [];
+            $results->total = 0;
+            $results->total_pages = 0;
             return $results;
         }
 
@@ -191,39 +229,101 @@ class Query_Filtering {
         }
 
         $current_language = apply_filters( 'wpml_current_language', null );
+        $default_language = apply_filters( 'wpml_default_language', null );
         
         if ( empty( $current_language ) ) {
             return $results;
         }
 
+        // Format element_type correctly for WPML (post_{post_type})
+        $element_type = 'post_' . ATBDP_POST_TYPE;
+        
+        // Try to use global sitepress for more reliable language detection
+        global $sitepress;
+        $use_global = ( isset( $sitepress ) && is_object( $sitepress ) && method_exists( $sitepress, 'get_language_for_element' ) );
+        
         // Filter IDs to only include listings in current language
         $filtered_ids = [];
         
         foreach ( $results->ids as $listing_id ) {
-            $language_info = apply_filters( 
-                'wpml_element_language_details', 
-                null, 
-                [
-                    'element_id'   => $listing_id,
-                    'element_type' => ATBDP_POST_TYPE
-                ]
-            );
-
-            if ( ! empty( $language_info ) && $language_info->language_code === $current_language ) {
+            // Skip invalid IDs
+            if ( empty( $listing_id ) || ! is_numeric( $listing_id ) ) {
+                continue;
+            }
+            
+            $listing_id = (int) $listing_id;
+            
+            // Get language code for this listing
+            $listing_language = null;
+            
+            if ( $use_global ) {
+                // Use global sitepress object (more reliable)
+                $listing_language = $sitepress->get_language_for_element( $listing_id, $element_type );
+            } else {
+                // Fallback to filter
+                $language_info = apply_filters( 
+                    'wpml_element_language_details', 
+                    null, 
+                    [
+                        'element_id'   => $listing_id,
+                        'element_type' => $element_type
+                    ]
+                );
+                
+                // Extract language code from language_info
+                if ( ! empty( $language_info ) && is_object( $language_info ) ) {
+                    if ( isset( $language_info->language_code ) ) {
+                        $listing_language = $language_info->language_code;
+                    } elseif ( isset( $language_info->language ) ) {
+                        // Some WPML versions use 'language' instead of 'language_code'
+                        $listing_language = $language_info->language;
+                    }
+                }
+            }
+            
+            // Include listing if:
+            // 1. Language matches current language, OR
+            // 2. No language info found AND current language is default (fallback for unassigned listings)
+            $should_include = false;
+            
+            if ( ! empty( $listing_language ) ) {
+                // Listing has language info - include if it matches current language
+                $should_include = ( $listing_language === $current_language );
+            } else {
+                // No language info found - include if current language is default
+                // This handles edge cases where listings don't have language assigned
+                if ( ! empty( $default_language ) && $current_language === $default_language ) {
+                    $should_include = true;
+                }
+            }
+            
+            if ( $should_include ) {
                 $filtered_ids[] = $listing_id;
             }
         }
 
-        // Update results
-        $results->ids = $filtered_ids;
-        $results->total = count( $filtered_ids );
-        
-        // Recalculate total pages if needed
-        if ( ! empty( $results->per_page ) && $results->per_page > 0 ) {
-            $results->total_pages = ceil( $results->total / $results->per_page );
+        // Only update if we actually filtered something out
+        // If WPML already filtered correctly at SQL level, this should be a no-op
+        if ( count( $filtered_ids ) !== count( $results->ids ) ) {
+            $results->ids = $filtered_ids;
+            $filtered_count = count( $filtered_ids );
+            
+            // Force update total - this is critical for the count display
+            $results->total = $filtered_count;
+            
+            // Also update found_posts if it exists (some templates might use this)
+            if ( isset( $results->found_posts ) ) {
+                $results->found_posts = $filtered_count;
+            }
+            
+            // Recalculate total pages based on filtered count
+            if ( ! empty( $results->per_page ) && $results->per_page > 0 ) {
+                $results->total_pages = $filtered_count > 0 ? ceil( $filtered_count / $results->per_page ) : 0;
+            } else {
+                $results->total_pages = $filtered_count > 0 ? 1 : 0;
+            }
         }
 
         return $results;
     }
 }
-
