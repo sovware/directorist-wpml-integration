@@ -56,8 +56,21 @@ class Search_Form_Field_Translation {
      * @return int Directory ID
      */
     private function get_directory_id_from_context() {
+        // During AJAX, try to get from POST data first (more efficient than backtrace)
+        if ( wp_doing_ajax() && ! empty( $_POST['listing_type'] ) ) {
+            $listing_type_slug = sanitize_text_field( $_POST['listing_type'] );
+            if ( function_exists( 'get_term_by' ) && function_exists( 'ATBDP_TYPE' ) ) {
+                $term = get_term_by( 'slug', $listing_type_slug, ATBDP_TYPE );
+                if ( $term && ! is_wp_error( $term ) ) {
+                    return (int) $term->term_id;
+                }
+            }
+        }
+        
         // Try to get from backtrace (get the searchform instance from the call stack)
-        $backtrace = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, 15 );
+        // Limit depth during AJAX to prevent performance issues
+        $backtrace_depth = wp_doing_ajax() ? 8 : 15;
+        $backtrace = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, $backtrace_depth );
         foreach ( $backtrace as $frame ) {
             if ( ! empty( $frame['object'] ) && is_object( $frame['object'] ) ) {
                 $class_name = get_class( $frame['object'] );
@@ -137,126 +150,106 @@ class Search_Form_Field_Translation {
             return $field_data;
         }
 
-        // Get widget name to identify the field type
         $widget_name = ! empty( $field_data['widget_name'] ) ? $field_data['widget_name'] : '';
-        
         if ( empty( $widget_name ) ) {
             return $field_data;
         }
 
         $widget_slug = $this->safe_slug( $widget_name );
 
-        // Translate field label
-        if ( ! empty( $field_data['label'] ) && is_string( $field_data['label'] ) ) {
-            $string_name = sprintf( 'search_form_dir_%d_field_%s_label', $directory_id, $widget_slug );
-            
-            $this->register_wpml_string( $string_name, $field_data['label'] );
-            $translated = $this->translate_wpml_string( $field_data['label'], $string_name );
-            
-            if ( ! empty( $translated ) && $translated !== $field_data['label'] ) {
-                $field_data['label'] = $translated;
-            }
-        }
+        // Translate common field properties
+        $field_data = $this->translate_field_property( $field_data, 'label', $directory_id, $widget_slug );
+        $field_data = $this->translate_field_property( $field_data, 'placeholder', $directory_id, $widget_slug );
+        $field_data = $this->translate_field_property( $field_data, 'description', $directory_id, $widget_slug );
 
-        // Translate field placeholder
-        if ( ! empty( $field_data['placeholder'] ) && is_string( $field_data['placeholder'] ) ) {
-            $string_name = sprintf( 'search_form_dir_%d_field_%s_placeholder', $directory_id, $widget_slug );
-            
-            $this->register_wpml_string( $string_name, $field_data['placeholder'] );
-            $translated = $this->translate_wpml_string( $field_data['placeholder'], $string_name );
-            
-            if ( ! empty( $translated ) && $translated !== $field_data['placeholder'] ) {
-                $field_data['placeholder'] = $translated;
-            }
-        }
-
-        // Translate field description if exists
-        if ( ! empty( $field_data['description'] ) && is_string( $field_data['description'] ) ) {
-            $string_name = sprintf( 'search_form_dir_%d_field_%s_description', $directory_id, $widget_slug );
-            
-            $this->register_wpml_string( $string_name, $field_data['description'] );
-            $translated = $this->translate_wpml_string( $field_data['description'], $string_name );
-            
-            if ( ! empty( $translated ) && $translated !== $field_data['description'] ) {
-                $field_data['description'] = $translated;
-            }
-        }
-
-        // Translate pricing field specific placeholders
+        // Translate field-specific properties
         if ( $widget_name === 'pricing' ) {
-            // Translate min placeholder
-            if ( ! empty( $field_data['price_range_min_placeholder'] ) && is_string( $field_data['price_range_min_placeholder'] ) ) {
-                $string_name = sprintf( 'search_form_dir_%d_field_%s_min_placeholder', $directory_id, $widget_slug );
-                
-                $this->register_wpml_string( $string_name, $field_data['price_range_min_placeholder'] );
-                $translated = $this->translate_wpml_string( $field_data['price_range_min_placeholder'], $string_name );
-                
-                if ( ! empty( $translated ) && $translated !== $field_data['price_range_min_placeholder'] ) {
-                    $field_data['price_range_min_placeholder'] = $translated;
-                }
-            } elseif ( empty( $field_data['price_range_min_placeholder'] ) ) {
-                // If empty, set default "Min" and translate it
-                $default_min = __( 'Min', 'directorist' );
-                $string_name = sprintf( 'search_form_dir_%d_field_%s_min_placeholder', $directory_id, $widget_slug );
-                
-                $this->register_wpml_string( $string_name, $default_min );
-                $translated = $this->translate_wpml_string( $default_min, $string_name );
-                
-                if ( ! empty( $translated ) ) {
-                    $field_data['price_range_min_placeholder'] = $translated;
-                }
-            }
-
-            // Translate max placeholder
-            if ( ! empty( $field_data['price_range_max_placeholder'] ) && is_string( $field_data['price_range_max_placeholder'] ) ) {
-                $string_name = sprintf( 'search_form_dir_%d_field_%s_max_placeholder', $directory_id, $widget_slug );
-                
-                $this->register_wpml_string( $string_name, $field_data['price_range_max_placeholder'] );
-                $translated = $this->translate_wpml_string( $field_data['price_range_max_placeholder'], $string_name );
-                
-                if ( ! empty( $translated ) && $translated !== $field_data['price_range_max_placeholder'] ) {
-                    $field_data['price_range_max_placeholder'] = $translated;
-                }
-            } elseif ( empty( $field_data['price_range_max_placeholder'] ) ) {
-                // If empty, set default "Max" and translate it
-                $default_max = __( 'Max', 'directorist' );
-                $string_name = sprintf( 'search_form_dir_%d_field_%s_max_placeholder', $directory_id, $widget_slug );
-                
-                $this->register_wpml_string( $string_name, $default_max );
-                $translated = $this->translate_wpml_string( $default_max, $string_name );
-                
-                if ( ! empty( $translated ) ) {
-                    $field_data['price_range_max_placeholder'] = $translated;
-                }
-            }
+            $field_data = $this->translate_pricing_field( $field_data, $directory_id, $widget_slug );
+        } elseif ( $widget_name === 'radius_search' ) {
+            $field_data = $this->translate_radius_search_field( $field_data, $directory_id, $widget_slug );
         }
 
-        // Translate radius search field specific strings
-        if ( $widget_name === 'radius_search' ) {
-            // Add min/max placeholders for radius search
-            if ( empty( $field_data['radius_min_placeholder'] ) ) {
-                $default_min = __( 'Min', 'directorist' );
-                $string_name = sprintf( 'search_form_dir_%d_field_%s_min_placeholder', $directory_id, $widget_slug );
-                
-                $this->register_wpml_string( $string_name, $default_min );
-                $translated = $this->translate_wpml_string( $default_min, $string_name );
-                
-                if ( ! empty( $translated ) ) {
-                    $field_data['radius_min_placeholder'] = $translated;
-                }
-            }
+        return $field_data;
+    }
 
-            if ( empty( $field_data['radius_max_placeholder'] ) ) {
-                $default_max = __( 'Max', 'directorist' );
-                $string_name = sprintf( 'search_form_dir_%d_field_%s_max_placeholder', $directory_id, $widget_slug );
-                
-                $this->register_wpml_string( $string_name, $default_max );
-                $translated = $this->translate_wpml_string( $default_max, $string_name );
-                
-                if ( ! empty( $translated ) ) {
-                    $field_data['radius_max_placeholder'] = $translated;
-                }
-            }
+    /**
+     * Translate a single field property (label, placeholder, description)
+     * 
+     * @param array $field_data Field data array
+     * @param string $property Property name (label, placeholder, description)
+     * @param int $directory_id Directory type ID
+     * @param string $widget_slug Widget slug
+     * @return array Modified field data
+     */
+    private function translate_field_property( $field_data, $property, $directory_id, $widget_slug ) {
+        if ( empty( $field_data[ $property ] ) || ! is_string( $field_data[ $property ] ) ) {
+            return $field_data;
+        }
+
+        $string_name = sprintf( 'search_form_dir_%d_field_%s_%s', $directory_id, $widget_slug, $property );
+        $this->register_wpml_string( $string_name, $field_data[ $property ] );
+        $translated = $this->translate_wpml_string( $field_data[ $property ], $string_name );
+
+        if ( ! empty( $translated ) && $translated !== $field_data[ $property ] ) {
+            $field_data[ $property ] = $translated;
+        }
+
+        return $field_data;
+    }
+
+    /**
+     * Translate pricing field specific placeholders
+     * 
+     * @param array $field_data Field data array
+     * @param int $directory_id Directory type ID
+     * @param string $widget_slug Widget slug
+     * @return array Modified field data
+     */
+    private function translate_pricing_field( $field_data, $directory_id, $widget_slug ) {
+        $field_data = $this->translate_min_max_placeholder( $field_data, 'price_range_min_placeholder', 'Min', $directory_id, $widget_slug );
+        $field_data = $this->translate_min_max_placeholder( $field_data, 'price_range_max_placeholder', 'Max', $directory_id, $widget_slug );
+        return $field_data;
+    }
+
+    /**
+     * Translate radius search field specific strings
+     * 
+     * @param array $field_data Field data array
+     * @param int $directory_id Directory type ID
+     * @param string $widget_slug Widget slug
+     * @return array Modified field data
+     */
+    private function translate_radius_search_field( $field_data, $directory_id, $widget_slug ) {
+        if ( empty( $field_data['radius_min_placeholder'] ) ) {
+            $field_data = $this->translate_min_max_placeholder( $field_data, 'radius_min_placeholder', 'Min', $directory_id, $widget_slug );
+        }
+        if ( empty( $field_data['radius_max_placeholder'] ) ) {
+            $field_data = $this->translate_min_max_placeholder( $field_data, 'radius_max_placeholder', 'Max', $directory_id, $widget_slug );
+        }
+        return $field_data;
+    }
+
+    /**
+     * Translate min/max placeholder with default fallback
+     * 
+     * @param array $field_data Field data array
+     * @param string $property Property name
+     * @param string $default Default value if property is empty
+     * @param int $directory_id Directory type ID
+     * @param string $widget_slug Widget slug
+     * @return array Modified field data
+     */
+    private function translate_min_max_placeholder( $field_data, $property, $default, $directory_id, $widget_slug ) {
+        $value = ! empty( $field_data[ $property ] ) && is_string( $field_data[ $property ] ) 
+            ? $field_data[ $property ] 
+            : __( $default, 'directorist' );
+
+        $string_name = sprintf( 'search_form_dir_%d_field_%s_%s', $directory_id, $widget_slug, str_replace( [ 'price_range_', 'radius_' ], '', $property ) );
+        $this->register_wpml_string( $string_name, $value );
+        $translated = $this->translate_wpml_string( $value, $string_name );
+
+        if ( ! empty( $translated ) ) {
+            $field_data[ $property ] = $translated;
         }
 
         return $field_data;
@@ -308,6 +301,13 @@ class Search_Form_Field_Translation {
      * @return void
      */
     public function start_output_buffer( $template, $file, $args ) {
+        // CRITICAL: Skip output buffering for AJAX requests to prevent infinite loops
+        // Output buffering interferes with AJAX JSON responses and causes infinite loading
+        // The directorist_template filter handles translations during AJAX
+        if ( wp_doing_ajax() ) {
+            return;
+        }
+
         if ( ! $this->is_wpml_active() ) {
             return;
         }
