@@ -296,7 +296,7 @@ class Search_Form_Field_Translation {
     private function translate_min_max_placeholder( $field_data, $property, $default, $directory_id, $widget_slug ) {
         $value = ! empty( $field_data[ $property ] ) && is_string( $field_data[ $property ] ) 
             ? $field_data[ $property ] 
-            : __( $default, 'directorist' );
+            : __( $default, 'directorist-wpml-integration' );
 
         $string_name = sprintf( 'search_form_dir_%d_field_%s_%s', $directory_id, $widget_slug, str_replace( [ 'price_range_', 'radius_' ], '', $property ) );
         $this->register_wpml_string( $string_name, $value );
