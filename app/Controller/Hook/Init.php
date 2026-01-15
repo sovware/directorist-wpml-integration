@@ -42,6 +42,7 @@ class Init {
             Add_Listing_Form_Translation::class,
 
             Directory_Translation::class,
+            Block_Widget_Translation::class,
 
         ];
     }

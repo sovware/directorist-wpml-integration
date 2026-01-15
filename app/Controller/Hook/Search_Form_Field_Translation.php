@@ -5,6 +5,9 @@
  * Makes Directorist Search Form field labels fully translatable with WPML String Translation.
  * Handles dynamic search form fields like Review, Tags, and other filter fields.
  * 
+ * Uses filter-based translation (no output buffering, no globals, no extract hacks, no debug_backtrace)
+ * for 100% reliability in both normal page loads and AJAX requests.
+ * 
  * @package Directorist_WPML_Integration
  * @since 2.1.6
  */
@@ -30,11 +33,11 @@ class Search_Form_Field_Translation {
      * @return void
      */
     public function __construct() {
-        // Modify the $args array before extract() is called in Helper::get_template
-        add_filter( 'directorist_template', [ $this, 'modify_template_args_before_extract' ], 10, 2 );
-        
-        // Use output buffering to translate hardcoded strings and ensure labels are translated
-        add_action( 'before_directorist_template_loaded', [ $this, 'start_output_buffer' ], 10, 3 );
+        // Hook into directorist_template filter to translate field data
+        // This runs in Helper::get_template() and we modify $args['data'] directly
+        // Location: trait-uri-helper.php line 63
+        // We have access to $args['searchform'] here, so we can get directory_id
+        add_filter( 'directorist_template', [ $this, 'apply_translated_field_data' ], 10, 2 );
     }
 
     /**
@@ -51,12 +54,20 @@ class Search_Form_Field_Translation {
     }
 
     /**
-     * Get directory ID from current context
+     * Get directory ID from searchform instance or context
      * 
+     * @param object|null $searchform SearchForm instance
      * @return int Directory ID
      */
-    private function get_directory_id_from_context() {
-        // During AJAX, try to get from POST data first (more efficient than backtrace)
+    private function get_directory_id( $searchform = null ) {
+        // First priority: Get from searchform instance
+        if ( ! empty( $searchform ) && is_object( $searchform ) ) {
+            if ( ! empty( $searchform->listing_type ) ) {
+                return (int) $searchform->listing_type;
+            }
+        }
+
+        // Second priority: During AJAX, get from POST data
         if ( wp_doing_ajax() && ! empty( $_POST['listing_type'] ) ) {
             $listing_type_slug = sanitize_text_field( $_POST['listing_type'] );
             if ( function_exists( 'get_term_by' ) && function_exists( 'ATBDP_TYPE' ) ) {
@@ -66,41 +77,30 @@ class Search_Form_Field_Translation {
                 }
             }
         }
-        
-        // Try to get from backtrace (get the searchform instance from the call stack)
-        // Limit depth during AJAX to prevent performance issues
-        $backtrace_depth = wp_doing_ajax() ? 8 : 15;
-        $backtrace = debug_backtrace( DEBUG_BACKTRACE_IGNORE_ARGS, $backtrace_depth );
-        foreach ( $backtrace as $frame ) {
-            if ( ! empty( $frame['object'] ) && is_object( $frame['object'] ) ) {
-                $class_name = get_class( $frame['object'] );
-                if ( 'Directorist\Directorist_Listing_Search_Form' === $class_name ) {
-                    if ( ! empty( $frame['object']->listing_type ) ) {
-                        return (int) $frame['object']->listing_type;
-                    }
-                }
-            }
-        }
-        
-        // Fallback: get default directory
+
+        // Fallback: Get default directory
         if ( function_exists( 'directorist_get_default_directory' ) ) {
             return (int) directorist_get_default_directory();
         }
-        
+
         return 0;
     }
 
+
     /**
-     * Modify template args before extract() is called
+     * Apply translated field data in directorist_template filter
      * 
-     * This intercepts the $args array in Helper::get_template before extract() is called.
-     * We modify $args['data'] directly. Since extract() uses the $args array, modifications should work.
+     * Hook Location: Helper::get_template() line 63
+     * Filter: apply_filters( 'directorist_template', $template, $args )
+     * 
+     * This filter receives $args which contains $args['data'] = $field_data and $args['searchform'].
+     * We translate the field_data here (now that we have directory_id from searchform) and replace $args['data'].
      * 
      * @param string $template Template name
-     * @param array $args Template arguments
+     * @param array $args Template arguments (contains 'data' => $field_data, 'searchform' => $searchform)
      * @return string Template name (unchanged)
      */
-    public function modify_template_args_before_extract( $template, $args ) {
+    public function apply_translated_field_data( $template, $args ) {
         // Only process search form field templates
         if ( strpos( $template, 'search-form/fields/' ) === false && strpos( $template, 'search-form/custom-fields/' ) === false ) {
             return $template;
@@ -110,31 +110,31 @@ class Search_Form_Field_Translation {
             return $template;
         }
 
-        // Check if this is a search form field template
+        // Check if this is a search form field template with field data
         if ( empty( $args['data'] ) || ! is_array( $args['data'] ) ) {
             return $template;
         }
 
-        // Get directory ID from searchform instance
+        // Get directory ID from searchform instance (available in $args)
         $directory_id = 0;
-        if ( ! empty( $args['searchform'] ) && ! empty( $args['searchform']->listing_type ) ) {
-            $directory_id = (int) $args['searchform']->listing_type;
+        if ( ! empty( $args['searchform'] ) && is_object( $args['searchform'] ) ) {
+            if ( ! empty( $args['searchform']->listing_type ) ) {
+                $directory_id = (int) $args['searchform']->listing_type;
+            }
         } else {
-            $directory_id = $this->get_directory_id_from_context();
+            $directory_id = $this->get_directory_id();
         }
-        
+
         if ( empty( $directory_id ) ) {
             return $template;
         }
 
-        // Translate the field data
+        // Translate the field data (now that we have directory_id)
         $translated_field_data = $this->translate_single_field( $args['data'], $directory_id );
-        
-        // Modify $args['data'] - output buffering will handle final translation
-        if ( ! empty( $translated_field_data ) && $translated_field_data !== $args['data'] ) {
-            $args['data'] = $translated_field_data;
-        }
-        
+
+        // Replace $args['data'] with translated version
+        $args['data'] = $translated_field_data;
+
         return $template;
     }
 
@@ -162,6 +162,11 @@ class Search_Form_Field_Translation {
         $field_data = $this->translate_field_property( $field_data, 'placeholder', $directory_id, $widget_slug );
         $field_data = $this->translate_field_property( $field_data, 'description', $directory_id, $widget_slug );
 
+        // Translate field options (for select, radio, checkbox fields)
+        if ( ! empty( $field_data['options'] ) && is_array( $field_data['options'] ) ) {
+            $field_data = $this->translate_field_options( $field_data, $directory_id, $widget_slug );
+        }
+
         // Translate field-specific properties
         if ( $widget_name === 'pricing' ) {
             $field_data = $this->translate_pricing_field( $field_data, $directory_id, $widget_slug );
@@ -169,6 +174,55 @@ class Search_Form_Field_Translation {
             $field_data = $this->translate_radius_search_field( $field_data, $directory_id, $widget_slug );
         }
 
+        return $field_data;
+    }
+
+    /**
+     * Translate field options array
+     * 
+     * @param array $field_data Field data array
+     * @param int $directory_id Directory type ID
+     * @param string $widget_slug Widget slug
+     * @return array Modified field data
+     */
+    private function translate_field_options( $field_data, $directory_id, $widget_slug ) {
+        if ( empty( $field_data['options'] ) || ! is_array( $field_data['options'] ) ) {
+            return $field_data;
+        }
+
+        $translated_options = [];
+        foreach ( $field_data['options'] as $key => $option ) {
+            if ( is_array( $option ) ) {
+                // Handle nested option arrays (e.g., ['value' => 'x', 'label' => 'y'])
+                if ( ! empty( $option['label'] ) && is_string( $option['label'] ) ) {
+                    // Use option value for stable naming, fallback to index
+                    $option_identifier = ! empty( $option['value'] ) ? $option['value'] : $key;
+                    $string_name = sprintf( 'search_form_dir_%d_field_%s_option_%s', $directory_id, $widget_slug, $this->safe_slug( $option_identifier ) );
+                    $this->register_wpml_string( $string_name, $option['label'] );
+                    $translated_label = $this->translate_wpml_string( $option['label'], $string_name );
+                    
+                    if ( ! empty( $translated_label ) && $translated_label !== $option['label'] ) {
+                        $option['label'] = $translated_label;
+                    }
+                }
+                $translated_options[ $key ] = $option;
+            } elseif ( is_string( $option ) ) {
+                // Handle simple option arrays (e.g., ['option1', 'option2'])
+                // Use option value for stable naming
+                $option_identifier = $option;
+                $string_name = sprintf( 'search_form_dir_%d_field_%s_option_%s', $directory_id, $widget_slug, $this->safe_slug( $option_identifier ) );
+                $this->register_wpml_string( $string_name, $option );
+                $translated_option = $this->translate_wpml_string( $option, $string_name );
+                
+                $translated_options[ $key ] = ! empty( $translated_option ) && $translated_option !== $option 
+                    ? $translated_option 
+                    : $option;
+            } else {
+                $translated_options[ $key ] = $option;
+            }
+        }
+
+        $field_data['options'] = $translated_options;
         return $field_data;
     }
 
@@ -263,12 +317,12 @@ class Search_Form_Field_Translation {
      * @return void
      */
     private function register_wpml_string( $string_name, $string_value ) {
-        if ( ! function_exists( 'icl_register_string' ) ) {
+        if ( ! function_exists( 'do_action' ) ) {
             return;
         }
         
         if ( is_string( $string_value ) && ! empty( $string_value ) ) {
-            icl_register_string( self::WPML_DOMAIN, $string_name, $string_value );
+            do_action( 'wpml_register_single_string', self::WPML_DOMAIN, $string_name, $string_value );
         }
     }
 
@@ -290,140 +344,6 @@ class Search_Form_Field_Translation {
             self::WPML_DOMAIN,
             $string_name
         );
-    }
-
-    /**
-     * Start output buffer for search form templates to translate hardcoded strings
-     * 
-     * @param string $template Template name
-     * @param string $file Template file path
-     * @param array $args Template arguments
-     * @return void
-     */
-    public function start_output_buffer( $template, $file, $args ) {
-        // CRITICAL: Skip output buffering for AJAX requests to prevent infinite loops
-        // Output buffering interferes with AJAX JSON responses and causes infinite loading
-        // The directorist_template filter handles translations during AJAX
-        if ( wp_doing_ajax() ) {
-            return;
-        }
-
-        if ( ! $this->is_wpml_active() ) {
-            return;
-        }
-
-        // Only process search form field templates
-        if ( strpos( $template, 'search-form/fields/' ) === false && strpos( $template, 'search-form/custom-fields/' ) === false ) {
-            return;
-        }
-
-        // Get directory ID
-        $directory_id = 0;
-        if ( ! empty( $args['searchform'] ) && ! empty( $args['searchform']->listing_type ) ) {
-            $directory_id = (int) $args['searchform']->listing_type;
-        } else {
-            $directory_id = $this->get_directory_id_from_context();
-        }
-
-        if ( empty( $directory_id ) ) {
-            return;
-        }
-
-        // Get field data
-        $field_data = ! empty( $args['data'] ) ? $args['data'] : [];
-        if ( empty( $field_data ) ) {
-            return;
-        }
-
-        // Translate field data and store for output replacement
-        $translated_field_data = $this->translate_single_field( $field_data, $directory_id );
-        
-        // Store translation info for output buffering
-        $GLOBALS['_directorist_wpml_template_translation'] = [
-            'template' => $template,
-            'directory_id' => $directory_id,
-            'original_data' => $field_data,
-            'translated_data' => $translated_field_data,
-        ];
-
-        // Start output buffering with callback
-        ob_start( [ $this, 'translate_template_output' ] );
-    }
-
-    /**
-     * Translate template output - replaces labels and hardcoded strings
-     * 
-     * @param string $output Buffered template output
-     * @return string Translated output
-     */
-    public function translate_template_output( $output ) {
-        if ( empty( $output ) || ! $this->is_wpml_active() ) {
-            return $output;
-        }
-
-        $translation_info = ! empty( $GLOBALS['_directorist_wpml_template_translation'] ) 
-            ? $GLOBALS['_directorist_wpml_template_translation'] 
-            : null;
-
-        if ( empty( $translation_info ) ) {
-            return $output;
-        }
-
-        $template = $translation_info['template'];
-        $directory_id = $translation_info['directory_id'];
-        $original_data = $translation_info['original_data'];
-        $translated_data = $translation_info['translated_data'];
-
-        // Replace field labels in output
-        if ( ! empty( $original_data['label'] ) && ! empty( $translated_data['label'] ) ) {
-            if ( $original_data['label'] !== $translated_data['label'] ) {
-                // Replace label in various HTML contexts
-                $escaped_original = esc_html( $original_data['label'] );
-                $escaped_translated = esc_html( $translated_data['label'] );
-                
-                // Replace in label tags
-                $output = str_replace( 
-                    '>' . $escaped_original . '<', 
-                    '>' . $escaped_translated . '<', 
-                    $output 
-                );
-                
-                // Also try unescaped version
-                $output = str_replace( 
-                    '>' . $original_data['label'] . '<', 
-                    '>' . $translated_data['label'] . '<', 
-                    $output 
-                );
-            }
-        }
-
-        // Handle radius_search "Min" and "Max" placeholders
-        if ( strpos( $template, 'search-form/fields/radius_search' ) !== false ) {
-            $min_string = __( 'Min', 'directorist' );
-            $max_string = __( 'Max', 'directorist' );
-            
-            $min_string_name = sprintf( 'search_form_dir_%d_field_radius_search_min_placeholder', $directory_id );
-            $max_string_name = sprintf( 'search_form_dir_%d_field_radius_search_max_placeholder', $directory_id );
-            
-            $this->register_wpml_string( $min_string_name, $min_string );
-            $this->register_wpml_string( $max_string_name, $max_string );
-            
-            $translated_min = $this->translate_wpml_string( $min_string, $min_string_name );
-            $translated_max = $this->translate_wpml_string( $max_string, $max_string_name );
-            
-            // Replace hardcoded "Min" and "Max" in placeholder attributes
-            if ( $translated_min !== $min_string ) {
-                $output = str_replace( 'placeholder="Min"', 'placeholder="' . esc_attr( $translated_min ) . '"', $output );
-            }
-            if ( $translated_max !== $max_string ) {
-                $output = str_replace( 'placeholder="Max"', 'placeholder="' . esc_attr( $translated_max ) . '"', $output );
-            }
-        }
-
-        // Clean up global
-        unset( $GLOBALS['_directorist_wpml_template_translation'] );
-
-        return $output;
     }
 
     /**
