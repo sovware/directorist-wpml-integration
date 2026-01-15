@@ -41,7 +41,8 @@ class Add_Listing_Form_Translation {
         // Translate section labels and store for output replacement
         add_filter( 'directorist_section_template', [ $this, 'translate_section_label' ], 10, 2 );
         
-        // Replace section labels in template output (fallback for cases where filter doesn't persist)
+        // Replace section labels in template output (handles sidebar navigation and section headers)
+        // This filter is applied after Helper::get_template_contents() returns the rendered HTML
         add_filter( 'atbdp_add_listing_page_template', [ $this, 'translate_section_labels_in_output' ], 10, 2 );
     }
 
@@ -464,13 +465,49 @@ class Add_Listing_Form_Translation {
             return $template_output;
         }
 
-        // Get directory ID from first section or args
+        // Get directory ID from args or request
         $directory_id = 0;
+        
+        // Method 1: From args
         if ( ! empty( $args['single_directory'] ) ) {
             $directory_id = (int) $args['single_directory'];
-        } elseif ( ! empty( $form_data[0] ) ) {
-            // Try to extract from form_data context
-            $directory_id = $this->get_directory_id_from_section_args( [ 'listing_form' => $args['listing_form'] ?? null ] );
+        } elseif ( ! empty( $args['listing_form'] ) && is_object( $args['listing_form'] ) ) {
+            // Try to get from ListingForm instance
+            if ( method_exists( $args['listing_form'], 'get_current_listing_type' ) ) {
+                $directory_id = (int) $args['listing_form']->get_current_listing_type();
+            }
+        }
+        
+        // Method 2: From request (fallback)
+        if ( empty( $directory_id ) && ! empty( $_REQUEST['directory_type'] ) ) {
+            $directory_type = sanitize_text_field( wp_unslash( $_REQUEST['directory_type'] ) );
+            if ( is_numeric( $directory_type ) ) {
+                $directory_id = (int) $directory_type;
+            } else {
+                $term = get_term_by( 'slug', $directory_type, 'atbdp_listing_types' );
+                if ( $term ) {
+                    $directory_id = (int) $term->term_id;
+                }
+            }
+        }
+        
+        // Method 3: Extract from URL (last resort)
+        if ( empty( $directory_id ) && ! empty( $_SERVER['REQUEST_URI'] ) ) {
+            $current_url = esc_url_raw( wp_unslash( $_SERVER['REQUEST_URI'] ) );
+            if ( preg_match( '/directory_type=([^&]+)/', $current_url, $matches ) ) {
+                $directory_type = $matches[1];
+                $term = get_term_by( 'slug', $directory_type, 'atbdp_listing_types' );
+                if ( $term ) {
+                    $directory_id = (int) $term->term_id;
+                }
+            }
+        }
+
+        if ( empty( $directory_id ) ) {
+            // Last resort: try to get default directory
+            if ( function_exists( 'directorist_get_default_directory' ) ) {
+                $directory_id = (int) directorist_get_default_directory();
+            }
         }
 
         if ( empty( $directory_id ) ) {
@@ -478,7 +515,26 @@ class Add_Listing_Form_Translation {
         }
 
         // Translate all section labels in output
-        foreach ( $form_data as $section ) {
+        // If form_data is empty, we'll still try to translate common section names
+        $sections_to_translate = [];
+        
+        if ( ! empty( $form_data ) && is_array( $form_data ) ) {
+            $sections_to_translate = $form_data;
+        } else {
+            // Fallback: use common section names if form_data is not available
+            // These are the standard Directorist section names
+            $common_sections = [
+                [ 'label' => 'General Information', 'key' => 'general_information' ],
+                [ 'label' => 'Pricing', 'key' => 'pricing' ],
+                [ 'label' => 'Features', 'key' => 'features' ],
+                [ 'label' => 'Contact Info', 'key' => 'contact_info' ],
+                [ 'label' => 'Location', 'key' => 'location' ],
+                [ 'label' => 'Media', 'key' => 'media' ],
+            ];
+            $sections_to_translate = $common_sections;
+        }
+        
+        foreach ( $sections_to_translate as $section ) {
             if ( empty( $section['label'] ) || ! is_string( $section['label'] ) ) {
                 continue;
             }
@@ -525,31 +581,63 @@ class Add_Listing_Form_Translation {
                 $regex_escaped_original = preg_quote( $escaped_original, '/' );
 
                 // Replace in navigation buttons (multistep-wizard__nav__btn)
-                // Pattern accounts for icon before label: <a>...icon...label</a>
-                // Label is NOT escaped in add-listing.php line 41, so match unescaped version
-                $pattern_nav_unescaped = '/(<a[^>]*class="[^"]*multistep-wizard__nav__btn[^"]*"[^>]*>)(.*?)' . $regex_original . '(<\/a>)/is';
-                $template_output = preg_replace( $pattern_nav_unescaped, '$1$2' . $translated . '$3', $template_output );
+                // Label is NOT escaped in add-listing.php line 41: printf(..., $section['label'])
+                // More flexible patterns to catch various HTML structures with whitespace variations
+                $patterns_nav = [
+                    // Pattern 1: Unescaped label after icon (with optional whitespace)
+                    '/(<a[^>]*class="[^"]*multistep-wizard__nav__btn[^"]*"[^>]*>)([\s\S]*?)' . $regex_original . '(<\/a>)/is',
+                    // Pattern 2: Escaped label after icon
+                    '/(<a[^>]*class="[^"]*multistep-wizard__nav__btn[^"]*"[^>]*>)([\s\S]*?)' . $regex_escaped_original . '(<\/a>)/is',
+                    // Pattern 3: Label directly in anchor (no icon, with optional whitespace)
+                    '/(<a[^>]*class="[^"]*multistep-wizard__nav__btn[^"]*"[^>]*>)\s*' . $regex_original . '\s*(<\/a>)/is',
+                    // Pattern 4: Escaped label directly in anchor
+                    '/(<a[^>]*class="[^"]*multistep-wizard__nav__btn[^"]*"[^>]*>)\s*' . $regex_escaped_original . '\s*(<\/a>)/is',
+                ];
                 
-                // Also try escaped version (for safety)
-                $pattern_nav_escaped = '/(<a[^>]*class="[^"]*multistep-wizard__nav__btn[^"]*"[^>]*>)(.*?)' . $regex_escaped_original . '(<\/a>)/is';
-                $template_output = preg_replace( $pattern_nav_escaped, '$1$2' . $escaped_translated . '$3', $template_output );
+                $replacements_nav = [
+                    '$1$2' . $translated . '$3',
+                    '$1$2' . $escaped_translated . '$3',
+                    '$1' . $translated . '$2',
+                    '$1' . $escaped_translated . '$2',
+                ];
+                
+                foreach ( $patterns_nav as $index => $pattern ) {
+                    $template_output = preg_replace( $pattern, $replacements_nav[ $index ], $template_output );
+                }
 
                 // Replace in section headers (directorist-content-module__title)
                 // Header uses esc_html() so match escaped version
-                $pattern_header = '/(<h2[^>]*class="[^"]*directorist-content-module__title[^"]*"[^>]*>)(.*?)' . $regex_escaped_original . '(<\/h2>)/is';
-                $template_output = preg_replace( $pattern_header, '$1$2' . $escaped_translated . '$3', $template_output );
+                $patterns_header = [
+                    // Pattern 1: Escaped label in h2
+                    '/(<h2[^>]*class="[^"]*directorist-content-module__title[^"]*"[^>]*>)(.*?)' . $regex_escaped_original . '(<\/h2>)/is',
+                    // Pattern 2: Unescaped label in h2
+                    '/(<h2[^>]*class="[^"]*directorist-content-module__title[^"]*"[^>]*>)(.*?)' . $regex_original . '(<\/h2>)/is',
+                    // Pattern 3: Label directly in h2 (no icon)
+                    '/(<h2[^>]*class="[^"]*directorist-content-module__title[^"]*"[^>]*>)' . $regex_escaped_original . '(<\/h2>)/is',
+                    // Pattern 4: Unescaped label directly in h2
+                    '/(<h2[^>]*class="[^"]*directorist-content-module__title[^"]*"[^>]*>)' . $regex_original . '(<\/h2>)/is',
+                ];
                 
-                // Also try unescaped header (for safety)
-                $pattern_header_unescaped = '/(<h2[^>]*class="[^"]*directorist-content-module__title[^"]*"[^>]*>)(.*?)' . $regex_original . '(<\/h2>)/is';
-                $template_output = preg_replace( $pattern_header_unescaped, '$1$2' . $translated . '$3', $template_output );
+                $replacements_header = [
+                    '$1$2' . $escaped_translated . '$3',
+                    '$1$2' . $translated . '$3',
+                    '$1' . $escaped_translated . '$2',
+                    '$1' . $translated . '$2',
+                ];
+                
+                foreach ( $patterns_header as $index => $pattern ) {
+                    $template_output = preg_replace( $pattern, $replacements_header[ $index ], $template_output );
+                }
 
                 // Fallback: Direct string replacement for any remaining instances
-                // Replace unescaped version
+                // Replace unescaped version (multiple patterns)
                 $template_output = str_replace( '>' . $original_label . '<', '>' . $translated . '<', $template_output );
                 $template_output = str_replace( '>' . $original_label . '</', '>' . $translated . '</', $template_output );
+                $template_output = str_replace( '>' . $original_label . ' ', '>' . $translated . ' ', $template_output );
                 // Replace escaped version
                 $template_output = str_replace( '>' . $escaped_original . '<', '>' . $escaped_translated . '<', $template_output );
                 $template_output = str_replace( '>' . $escaped_original . '</', '>' . $escaped_translated . '</', $template_output );
+                $template_output = str_replace( '>' . $escaped_original . ' ', '>' . $escaped_translated . ' ', $template_output );
             }
         }
 
