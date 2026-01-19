@@ -240,4 +240,72 @@
             <key>text</key>
         </gutenberg-block>
     </gutenberg-blocks>
+
+    <elementor-widgets>
+        <widget name="directorist_all_listing">
+            <fields>
+                <field>header_title</field>
+            </fields>
+        </widget>
+        <widget name="directorist_search_listing">
+            <fields>
+                <field>title</field>
+                <field>subtitle</field>
+                <field>search_btn_text</field>
+                <field>more_filter_btn_text</field>
+                <field>more_filter_reset_btn_text</field>
+                <field>more_filter_search_btn_text</field>
+            </fields>
+        </widget>
+        <widget name="directorist_search_result">
+            <fields>
+                <field>header_title</field>
+            </fields>
+        </widget>
+        <widget name="directorist_category">
+            <fields>
+                <field>header_title</field>
+            </fields>
+        </widget>
+        <widget name="directorist_location">
+            <fields>
+                <field>header_title</field>
+            </fields>
+        </widget>
+        <widget name="directorist_tag">
+            <fields>
+                <field>header_title</field>
+            </fields>
+        </widget>
+        <widget name="directorist_user_login">
+            <fields>
+                <field>signin_username_label</field>
+                <field>signin_button_label</field>
+                <field>recovery_password_label</field>
+                <field>recovery_password_description</field>
+                <field>recovery_password_email_label</field>
+                <field>recovery_password_email_placeholder</field>
+                <field>recovery_password_button_label</field>
+                <field>signup_label</field>
+                <field>signup_linking_text</field>
+                <field>author_role_label</field>
+                <field>user_role_label</field>
+                <field>username_label</field>
+                <field>password_label</field>
+                <field>email_label</field>
+                <field>website_label</field>
+                <field>firstname_label</field>
+                <field>lastname_label</field>
+                <field>bio_label</field>
+                <field>privacy_label</field>
+                <field>privacy_linking_text</field>
+                <field>terms_label</field>
+                <field>terms_linking_text</field>
+                <field>signup_button_label</field>
+                <field>signin_message</field>
+                <field>signin_linking_text</field>
+                <field>active_form</field>
+            </fields>
+        </widget>
+    </elementor-widgets>
 </wpml-config>

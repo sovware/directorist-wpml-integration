@@ -4,7 +4,7 @@ Tags: directory, directorist, directorist wpml, wpml
 Requires at least: 5.7
 Tested up to: 6.8
 Requires PHP: 7.4
-Stable tag: 2.1.4
+Stable tag: 2.2.0
 License: GPLv3
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -59,6 +59,14 @@ If you want to contribute to the project, you’re most welcome to make it happe
 3. Use the `Add New` button in the Block Editor toolbar when needed.
 
 == Changelogs == 
+2.2.0 - Jan 15, 2026
+
+* Fixed: string translation 
+* Fixed: New translatable data is available for translation and displays correctly on the front-end
+* Fixed: Data saved in posts is still translatable and displays correctly in the front-end.
+* Fixed: Data saved in taxonomies is still translatable and displays correctly on the front-end.
+* Fixed: Front-end strings are still translatable with WPML String Translation and display correctly.
+* Fixed: Email sending process: content is translated and sent in the user’s preferred language.
 
 2.1.4 - Jun 09, 2025
 
