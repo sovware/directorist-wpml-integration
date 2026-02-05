@@ -12,6 +12,19 @@
         <taxonomy translate="1">atbdp_listing_types</taxonomy>
     </taxonomies>
 
+    <!--
+        Ensure each directory type term keeps the same "default" flag across all
+        languages so there is always a default directory type per language.
+        This mirrors WPML’s suggested configuration:
+
+        <custom-term-fields>
+          <custom-term-field action="copy">_default</custom-term-field>
+        </custom-term-fields>
+    -->
+    <custom-term-fields>
+        <custom-term-field action="copy">_default</custom-term-field>
+    </custom-term-fields>
+
     <admin-texts>
         <key name="atbdp_option">
             <!-- All Listings -->
