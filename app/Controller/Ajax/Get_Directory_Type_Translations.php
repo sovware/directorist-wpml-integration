@@ -2,6 +2,7 @@
 
 namespace Directorist_WPML_Integration\Controller\Ajax;
 
+use Directorist_WPML_Integration\Controller\Hook\Directory_Type_ATE_Translation;
 use Directorist_WPML_Integration\Helper\Response;
 use Directorist_WPML_Integration\Helper\WPML_Helper;
 
@@ -15,6 +16,7 @@ class Get_Directory_Type_Translations {
     function __construct() {
         add_action( 'wp_ajax_get_directory_type_translations', [ $this, 'get_directory_type_translations_data' ] );
         add_action( 'wp_ajax_create_directory_type_translation', [ $this, 'create_directory_type_translation' ] );
+        add_action( 'wp_ajax_prepare_directory_type_ate_translation', [ $this, 'prepare_directory_type_ate_translation' ] );
     }
 
     /**
@@ -36,6 +38,7 @@ class Get_Directory_Type_Translations {
             'wpml_active_languages'          => $this->get_wpml_active_languages(),
             'translations'                   => $this->get_directory_type_translations(),
             'translation_edit_link_template' => admin_url( 'edit.php?post_type=at_biz_dir&page=atbdp-directory-types&listing_type_id=__ID__&action=edit&lang=__LANGUAGE__' ),
+            'ate_translation_available'      => $this->is_ate_translation_available(),
         ];
 
         $response->success = true;
@@ -118,6 +121,39 @@ class Get_Directory_Type_Translations {
         wp_send_json( $response->toArray() );
     }
 
+    /**
+     * Prepare a WPML Advanced Translation Editor job for a directory type.
+     *
+     * @return void
+     */
+    public function prepare_directory_type_ate_translation() {
+        $response = new Response();
+
+        if ( ! directorist_verify_nonce() ) {
+            $response->message = __( 'Access denied.', 'directorist-wpml-integration' );
+            wp_send_json( $response->toArray() );
+        }
+
+        $directory_type_id         = ( isset( $_REQUEST['directory_type_id'] ) ) ? absint( $_REQUEST['directory_type_id'] ) : 0;
+        $translation_language_code = ( isset( $_REQUEST['translation_language_code'] ) ) ? sanitize_key( wp_unslash( $_REQUEST['translation_language_code'] ) ) : '';
+        $return_url                = ( isset( $_REQUEST['return_url'] ) ) ? esc_url_raw( wp_unslash( $_REQUEST['return_url'] ) ) : '';
+
+        if ( empty( $directory_type_id ) ) {
+            $response->message = __( 'Directory type ID is required', 'directorist-wpml-integration' );
+            wp_send_json( $response->toArray() );
+        }
+
+        if ( empty( $translation_language_code ) ) {
+            $response->message = __( 'Translation language code is required', 'directorist-wpml-integration' );
+            wp_send_json( $response->toArray() );
+        }
+
+        $ate_translation = new Directory_Type_ATE_Translation();
+        $response        = $ate_translation->prepare_translation_job( $directory_type_id, $translation_language_code, $return_url );
+
+        wp_send_json( $response->toArray() );
+    }
+
     
     /**
      * Get WPML ctive languages
@@ -126,6 +162,24 @@ class Get_Directory_Type_Translations {
      */
     public function get_wpml_active_languages() {
         return apply_filters( 'wpml_active_languages', NULL, 'orderby=name&order=asc' );
+    }
+
+    /**
+     * Check whether the required WPML ATE package APIs are available.
+     *
+     * @return bool
+     */
+    private function is_ate_translation_available() {
+        return defined( 'ICL_SITEPRESS_VERSION' )
+            && defined( 'WPML_ST_VERSION' )
+            && defined( 'WPML_TM_VERSION' )
+            && class_exists( '\WPML_Package' )
+            && class_exists( '\WPML_Package_TM' )
+            && class_exists( '\WPML_TM_Translation_Batch' )
+            && class_exists( '\WPML_TM_Translation_Batch_Element' )
+            && class_exists( '\WPML_TM_ATE_Status' )
+            && method_exists( '\WPML_TM_ATE_Status', 'is_enabled_and_activated' )
+            && \WPML_TM_ATE_Status::is_enabled_and_activated();
     }
 
     /**

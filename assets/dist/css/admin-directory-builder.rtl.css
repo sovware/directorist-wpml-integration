@@ -41,47 +41,11 @@ span.directorist-list-item-icon {
   cursor: not-allowed;
 }
 
-.directorist-wpml-builder-translation-bar {
-  align-items: center;
-  background: #fff;
-  border: 1px solid #dcdcde;
-  border-right: 4px solid #33879e;
-  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
-  display: flex;
-  gap: 16px;
-  justify-content: space-between;
-  margin: 16px 0;
-  padding: 14px 16px;
-}
-
-.directorist-wpml-builder-translation-bar__content {
-  display: grid;
-  gap: 4px;
-}
-
-.directorist-wpml-builder-translation-bar__content strong {
-  color: #1d2327;
-  font-size: 14px;
-}
-
-.directorist-wpml-builder-translation-bar__content span {
-  color: #646970;
-}
-
-.directorist-wpml-builder-translation-bar__button {
-  flex: 0 0 auto;
-}
-
-@media (max-width: 782px) {
-  .directorist-wpml-builder-translation-bar {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
-
 .directorist_builder__content .directorist_builder__content--right .directorist_builder--tabContent .directorist_table tbody tr td .directorist_listing-actions a.directorist_translation-dropdown-toggle {
+  align-items: center;
   color: #5A5F7D;
-  display: inline-block;
+  display: inline-flex;
+  gap: 6px;
   text-decoration: none;
   margin: 5px;
   border-radius: 6px !important;
@@ -94,6 +58,11 @@ span.directorist-list-item-icon {
 
 .directorist_builder__content .directorist_builder__content--right .directorist_builder--tabContent .directorist_table tbody tr td .directorist_listing-actions a.directorist_translation-dropdown-toggle i {
   margin-left: 0;
+}
+
+.directorist-wpml-translation-label {
+  font-size: 13px;
+  font-weight: 500;
 }
 .directorist-list-item {
   display: -webkit-box;

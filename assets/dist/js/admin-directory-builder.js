@@ -145,7 +145,7 @@ var tasks = {
       }
 
       self.addTranslationLinksToDirectoryType(response.data);
-      self.attachAddTranslationActionHandler();
+      self.attachATETranslationActionHandler();
     }).catch(function (error) {
       console.log({
         error: error
@@ -167,6 +167,10 @@ var tasks = {
     }
 
     if (!data.wpml_active_languages) {
+      return;
+    }
+
+    if (!data.ate_translation_available) {
       return;
     }
 
@@ -195,14 +199,12 @@ var tasks = {
         var hasTranslation = termTranslationKeys.includes(translation_key);
         var iconName = hasTranslation ? 'fas fa-edit' : 'fas fa-plus';
         var flag = translation.country_flag_url;
-        var translationTermID = hasTranslation ? term_translations[termID][translation_key].term_id : 0;
-        var link = hasTranslation ? self.parseTranslationEditLinkTemplate(data.translation_edit_link_template, translationTermID, translation_key) : '#';
-        var linkClass = hasTranslation ? '' : ' directorist-link-has-action directorist-wpml-add-translation';
-        return "<li class=\"directorist-list-item\" data-language-code=\"".concat(translation_key, "\">\n                    <span class=\"directorist-list-item-label\">\n                        <span class=\"directorist-list-item-icon\">\n                            <img src=\"").concat(flag, "\" />\n                        </span>\n        \n                        ").concat(label, "\n                    </span>\n        \n                    <div class=\"directorist-list-item-actions\">\n                        <a href=\"").concat(link, "\" class=\"directorist-list-item-action-link directorist-text-right--important").concat(linkClass, "\">\n                            <i class=\"").concat(iconName, "\"></i>\n                        </a>\n                    </div>\n                </li>");
+        var actionLabel = hasTranslation ? 'Edit in Advanced Translation Editor' : 'Translate in Advanced Translation Editor';
+        return "<li class=\"directorist-list-item\" data-language-code=\"".concat(translation_key, "\">\n                    <span class=\"directorist-list-item-label\">\n                        <span class=\"directorist-list-item-icon\">\n                            <img src=\"").concat(flag, "\" />\n                        </span>\n        \n                        ").concat(label, "\n                    </span>\n        \n                    <div class=\"directorist-list-item-actions\">\n                        <a href=\"#\" class=\"directorist-list-item-action-link directorist-text-right--important directorist-link-has-action directorist-wpml-open-ate-translation\" title=\"").concat(actionLabel, "\" aria-label=\"").concat(actionLabel, "\">\n                            <i class=\"").concat(iconName, "\"></i>\n                        </a>\n                    </div>\n                </li>");
       }).filter(function (item) {
         return item;
       }).join("\n");
-      var translation_button = "\n                <a href=\"#\" class=\"directorist_btn directorist_btn-primary directorist_more-dropdown-toggle directorist_translation-dropdown-toggle\">\n                    <i class=\"fas fa-language\"></i>\n                </a>\n        \n                <div class=\"directorist_more-dropdown-option\">\n                    <ul>".concat(translationListItems, "</ul>\n                </div>\n            ");
+      var translation_button = "\n                <a href=\"#\" class=\"directorist_btn directorist_btn-primary directorist_more-dropdown-toggle directorist_translation-dropdown-toggle\" title=\"Translate with WPML Advanced Translation Editor\" aria-label=\"Translate with WPML Advanced Translation Editor\">\n                    <i class=\"fas fa-language\"></i>\n                    <span class=\"directorist-wpml-translation-label\">Translate</span>\n                </a>\n        \n                <div class=\"directorist_more-dropdown-option\">\n                    <ul>".concat(translationListItems, "</ul>\n                </div>\n            ");
       translation_button_wrap.innerHTML = translation_button;
       item.prepend(translation_button_wrap);
     });
@@ -211,16 +213,16 @@ var tasks = {
   parseTranslationEditLinkTemplate: function parseTranslationEditLinkTemplate(template, translationID, languageKey) {
     return template.replace('__ID__', translationID).replace('__LANGUAGE__', languageKey);
   },
-  // attachAddTranslationActionHandler
-  attachAddTranslationActionHandler: function attachAddTranslationActionHandler() {
-    var links = document.querySelectorAll('.directorist-wpml-add-translation');
+  // attachATETranslationActionHandler
+  attachATETranslationActionHandler: function attachATETranslationActionHandler() {
+    var links = document.querySelectorAll('.directorist-wpml-open-ate-translation');
 
     _babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0___default()(links).map(function (link) {
-      link.addEventListener('click', handleAddTranslationAction);
+      link.addEventListener('click', handleATETranslationAction);
     });
   },
-  // addTranslation
-  addTranslation: function addTranslation(context, event) {
+  // openATETranslation
+  openATETranslation: function openATETranslation(context, event) {
     var dropdown = context.closest('.directorist_more-dropdown-option');
     dropdown.classList.add('active');
 
@@ -237,10 +239,11 @@ var tasks = {
     var language_code = context.closest('.directorist-list-item').getAttribute('data-language-code');
     var url = directory_builder_script_data.ajax_url;
     var formData = {
-      action: 'create_directory_type_translation',
+      action: 'prepare_directory_type_ate_translation',
       directorist_nonce: directory_builder_script_data.directorist_nonce,
       directory_type_id: directory_type_id,
-      taranslation_language_code: language_code
+      translation_language_code: language_code,
+      return_url: window.location.href
     };
     var queryStrings = new URLSearchParams(formData).toString();
     url = url + '?' + queryStrings;
@@ -258,11 +261,9 @@ var tasks = {
         return;
       }
 
-      context.setAttribute('href', response.data.edit_link);
-      context.removeEventListener('click', handleAddTranslationAction);
-      context.classList.remove('directorist-link-has-action');
-      context.classList.remove('directorist-wpml-add-translation');
-      context.innerHTML = '<i class="fas fa-edit"></i>';
+      if (response.data && response.data.edit_link) {
+        window.location.href = response.data.edit_link;
+      }
     }).catch(function (error) {
       context.classList.remove('directorist-is-loading');
       context.innerHTML = originalContent;
@@ -273,13 +274,13 @@ var tasks = {
   }
 }; // Init
 
-tasks.init(); // handleAddTranslationAction
+tasks.init(); // handleATETranslationAction
 
-function handleAddTranslationAction(event) {
+function handleATETranslationAction(event) {
   event.preventDefault();
   var context = this;
   setTimeout(function () {
-    tasks.addTranslation(context, event);
+    tasks.openATETranslation(context, event);
   }, 0);
 }
 

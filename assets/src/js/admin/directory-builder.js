@@ -31,7 +31,7 @@ const tasks = {
                 }
 
                 self.addTranslationLinksToDirectoryType( response.data );
-                self.attachAddTranslationActionHandler();
+                self.attachATETranslationActionHandler();
             })
             .catch( error => {
                 console.log( { error } );
@@ -53,6 +53,10 @@ const tasks = {
         }
 
         if ( ! data.wpml_active_languages ) {
+            return;
+        }
+
+        if ( ! data.ate_translation_available ) {
             return;
         }
 
@@ -85,9 +89,7 @@ const tasks = {
                 const hasTranslation      = termTranslationKeys.includes( translation_key ) ;
                 const iconName            = hasTranslation ? 'fas fa-edit' : 'fas fa-plus';
                 const flag                = translation.country_flag_url;
-                const translationTermID   = hasTranslation ? term_translations[ termID ][ translation_key ].term_id : 0;
-                const link                = hasTranslation ?  self.parseTranslationEditLinkTemplate( data.translation_edit_link_template, translationTermID, translation_key ) : '#';
-                const linkClass           = hasTranslation ? '' : ' directorist-link-has-action directorist-wpml-add-translation';
+                const actionLabel         = hasTranslation ? 'Edit in Advanced Translation Editor' : 'Translate in Advanced Translation Editor';
         
                 return `<li class="directorist-list-item" data-language-code="${translation_key}">
                     <span class="directorist-list-item-label">
@@ -99,7 +101,7 @@ const tasks = {
                     </span>
         
                     <div class="directorist-list-item-actions">
-                        <a href="${link}" class="directorist-list-item-action-link directorist-text-right--important${linkClass}">
+                        <a href="#" class="directorist-list-item-action-link directorist-text-right--important directorist-link-has-action directorist-wpml-open-ate-translation" title="${actionLabel}" aria-label="${actionLabel}">
                             <i class="${iconName}"></i>
                         </a>
                     </div>
@@ -107,8 +109,9 @@ const tasks = {
             }).filter( item => item ).join("\n");
         
             const translation_button = `
-                <a href="#" class="directorist_btn directorist_btn-primary directorist_more-dropdown-toggle directorist_translation-dropdown-toggle">
+                <a href="#" class="directorist_btn directorist_btn-primary directorist_more-dropdown-toggle directorist_translation-dropdown-toggle" title="Translate with WPML Advanced Translation Editor" aria-label="Translate with WPML Advanced Translation Editor">
                     <i class="fas fa-language"></i>
+                    <span class="directorist-wpml-translation-label">Translate</span>
                 </a>
         
                 <div class="directorist_more-dropdown-option">
@@ -129,17 +132,17 @@ const tasks = {
             .replace( '__LANGUAGE__', languageKey );
     },
 
-    // attachAddTranslationActionHandler
-    attachAddTranslationActionHandler: function () {
-        const links = document.querySelectorAll( '.directorist-wpml-add-translation' );
+    // attachATETranslationActionHandler
+    attachATETranslationActionHandler: function () {
+        const links = document.querySelectorAll( '.directorist-wpml-open-ate-translation' );
 
         [ ...links ].map( link => {
-            link.addEventListener( 'click', handleAddTranslationAction );
+            link.addEventListener( 'click', handleATETranslationAction );
         });
     },
 
-    // addTranslation
-    addTranslation: function ( context, event ) {
+    // openATETranslation
+    openATETranslation: function ( context, event ) {
         const dropdown = context.closest( '.directorist_more-dropdown-option' );
         dropdown.classList.add( 'active' );
 
@@ -158,10 +161,11 @@ const tasks = {
 
         let url = directory_builder_script_data.ajax_url;
         const formData = {
-            action: 'create_directory_type_translation',
+            action: 'prepare_directory_type_ate_translation',
             directorist_nonce: directory_builder_script_data.directorist_nonce,
             directory_type_id,
-            taranslation_language_code: language_code,
+            translation_language_code: language_code,
+            return_url: window.location.href,
         };
 
         const queryStrings = new URLSearchParams( formData ).toString();
@@ -180,13 +184,9 @@ const tasks = {
                     return;
                 }
 
-                context.setAttribute( 'href', response.data.edit_link );
-                context.removeEventListener( 'click', handleAddTranslationAction );
-
-                context.classList.remove( 'directorist-link-has-action' );
-                context.classList.remove( 'directorist-wpml-add-translation' );
-
-                context.innerHTML = '<i class="fas fa-edit"></i>';
+                if ( response.data && response.data.edit_link ) {
+                    window.location.href = response.data.edit_link;
+                }
             })
             .catch( error => {
                 context.classList.remove( 'directorist-is-loading' );
@@ -200,12 +200,12 @@ const tasks = {
 // Init
 tasks.init();
 
-// handleAddTranslationAction
-function handleAddTranslationAction( event ) {
+// handleATETranslationAction
+function handleATETranslationAction( event ) {
     event.preventDefault();
     const context = this;
 
     setTimeout( function() {
-        tasks.addTranslation( context, event )
+        tasks.openATETranslation( context, event )
     }, 0 );
 }

@@ -68,7 +68,7 @@ If you want to contribute to the project, you're welcome to help. The full sourc
 = 2.2.2 - May 04, 2026 =
 
 * Added: WPML `wpml-config.xml` coverage for Directorist directory type term meta, including directory builder form/layout fields, terms/privacy labels, sidebar settings, similar listing settings, and custom single listing page IDs.
-* Added: WPML translation shortcut inside the Directorist Directory Builder edit screen for existing directory types.
+* Added: WPML Advanced Translation Editor package jobs for Directorist directory builder strings, available from the All Directories translation action.
 * Added: Runtime synchronization for copy-only directory type settings so structural options stay aligned across translated directory types after saving the Directorist Directory Builder.
 * Improved: Custom single listing page handling by registering the directory type `single_listing_page` term meta as a translatable page ID for WPML.
 * Improved: Gutenberg block translation configuration format to validate cleanly against WPML's installed XML schema.
