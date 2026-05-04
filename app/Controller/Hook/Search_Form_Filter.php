@@ -77,12 +77,13 @@ class Search_Form_Filter {
             }
 
             // Check if term is in current language
-            $term_language = apply_filters( 
+            $element_type  = apply_filters( 'wpml_element_type', $taxonomy );
+            $term_language = apply_filters(
                 'wpml_element_language_details', 
                 null, 
                 [
                     'element_id'   => $term_id,
-                    'element_type' => $taxonomy
+                    'element_type' => $element_type,
                 ]
             );
 
@@ -193,4 +194,3 @@ class Search_Form_Filter {
         }
     }
 }
-

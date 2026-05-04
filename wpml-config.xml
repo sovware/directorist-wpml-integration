@@ -15,19 +15,53 @@
     <!--
         custom-term-fields for atbdp_listing_types (directory type) term meta:
 
-        - submission_form_fields  : translate - keeps listing form field labels
-          per language so editing the default language does not overwrite
-          translated label values (comp-4370).
+        Copy fields:
+        - structural/config values that should follow the source directory type
+          across translations.
 
-        - single_listings_contents : translate - keeps single listing page layout
-          and widget labels per language for the same reason (comp-4370).
+        Translate fields:
+        - directory-type text and builder payloads that WPML should include in
+          taxonomy translation jobs / ATE.
 
-        - _default : copy - every language needs its own default directory type
-          flag so Directorist always has a valid default (comp-4354).
+        _default remains copied separately so each translation keeps a valid
+        default-directory flag (comp-4354).
     -->
     <custom-term-fields>
+        <custom-term-field action="copy">general_config</custom-term-field>
+        <custom-term-field action="copy">preview_mode</custom-term-field>
+        <custom-term-field action="copy">default_expiration</custom-term-field>
+        <custom-term-field action="copy">new_listing_status</custom-term-field>
+        <custom-term-field action="copy">edit_listing_status</custom-term-field>
+        <custom-term-field action="copy">listing_terms_condition</custom-term-field>
+        <custom-term-field action="copy">require_terms_conditions</custom-term-field>
+        <custom-term-field action="copy">listing_privacy</custom-term-field>
+        <custom-term-field action="copy">require_privacy</custom-term-field>
+        <custom-term-field action="copy">privacy_is_required</custom-term-field>
+        <custom-term-field action="copy">enable_sidebar</custom-term-field>
+        <custom-term-field action="copy">enable_single_listing_page</custom-term-field>
+        <custom-term-field action="copy" type="post-ids" sub-type="page">single_listing_page</custom-term-field>
+        <custom-term-field action="copy">enable_similar_listings</custom-term-field>
+        <custom-term-field action="copy">similar_listings_logics</custom-term-field>
+        <custom-term-field action="copy">listing_from_same_author</custom-term-field>
+        <custom-term-field action="copy">similar_listings_number_of_listings_to_show</custom-term-field>
+        <custom-term-field action="copy">similar_listings_number_of_columns</custom-term-field>
+
+        <custom-term-field action="translate">submit_button_label</custom-term-field>
+        <custom-term-field action="translate">terms_privacy_label</custom-term-field>
+        <custom-term-field action="translate">terms_label</custom-term-field>
+        <custom-term-field action="translate">terms_name</custom-term-field>
+        <custom-term-field action="translate">terms_link</custom-term-field>
+        <custom-term-field action="translate">privacy_label</custom-term-field>
+        <custom-term-field action="translate">privacy_name</custom-term-field>
+        <custom-term-field action="translate">privacy_link</custom-term-field>
+        <custom-term-field action="translate">similar_listings_title</custom-term-field>
+
         <custom-term-field action="translate">submission_form_fields</custom-term-field>
+        <custom-term-field action="translate">search_form_fields</custom-term-field>
+        <custom-term-field action="translate">single_listing_header</custom-term-field>
         <custom-term-field action="translate">single_listings_contents</custom-term-field>
+        <custom-term-field action="translate">listings_card_grid_view</custom-term-field>
+        <custom-term-field action="translate">listings_card_list_view</custom-term-field>
         <custom-term-field action="copy">_default</custom-term-field>
     </custom-term-fields>
 
@@ -231,41 +265,41 @@
 
     <gutenberg-blocks>
         <gutenberg-block type="directorist/search-listing" translate="1">
-            <key>search_bar_title</key>
-            <key>search_bar_sub_title</key>
-            <key>more_filters_text</key>
-            <key>reset_filters_text</key>
-            <key>apply_filters_text</key>
+            <key name="search_bar_title" />
+            <key name="search_bar_sub_title" />
+            <key name="more_filters_text" />
+            <key name="reset_filters_text" />
+            <key name="apply_filters_text" />
         </gutenberg-block>
 
         <gutenberg-block type="directorist/all-listing" translate="1">
-            <key>header_title</key>
+            <key name="header_title" />
         </gutenberg-block>
 
         <gutenberg-block type="directorist/search-result" translate="1">
-            <key>header_title</key>
+            <key name="header_title" />
         </gutenberg-block>
 
         <gutenberg-block type="directorist/category" translate="1">
-            <key>header_title</key>
+            <key name="header_title" />
         </gutenberg-block>
 
         <gutenberg-block type="directorist/location" translate="1">
-            <key>header_title</key>
+            <key name="header_title" />
         </gutenberg-block>
 
         <gutenberg-block type="directorist/tag" translate="1">
-            <key>header_title</key>
+            <key name="header_title" />
         </gutenberg-block>
 
         <gutenberg-block type="directorist/account-button" translate="1">
-            <key>title</key>
-            <key>text</key>
+            <key name="title" />
+            <key name="text" />
         </gutenberg-block>
 
         <gutenberg-block type="directorist/search-modal" translate="1">
-            <key>title</key>
-            <key>text</key>
+            <key name="title" />
+            <key name="text" />
         </gutenberg-block>
     </gutenberg-blocks>
 
