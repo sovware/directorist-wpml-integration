@@ -15,6 +15,7 @@ Official WPML integration extension for [Directorist](https://directorist.com) t
 ### 2.2.2 - May 04, 2026
 
 - Added expanded WPML config coverage for Directorist directory type metadata.
+- Added a WPML translation shortcut inside the Directory Builder edit screen.
 - Added runtime sync for copy-only directory type settings after Directory Builder saves.
 - Registered custom single listing page term meta as a WPML page ID field.
 - Fixed taxonomy language filtering in search form terms.
