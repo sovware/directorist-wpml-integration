@@ -30,6 +30,7 @@ class Init {
             REST_API::class,
             Filter_Permalinks::class,
             Directory_Builder_Actions::class,
+            Directory_Builder_ATE_Translation_Button::class,
             Directory_Type_ATE_Translation::class,
             Directory_Type_Meta_Sync::class,
             Listings_Actions::class,

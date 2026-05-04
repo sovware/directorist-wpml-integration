@@ -123,6 +123,7 @@ __webpack_require__.r(__webpack_exports__);
 var tasks = {
   init: function init() {
     this.setupTranslationLinksToDirectoryType();
+    this.attachBuilderATETranslationHandler();
   },
   // setupTranslationLinksToDirectoryType
   setupTranslationLinksToDirectoryType: function setupTranslationLinksToDirectoryType() {
@@ -271,6 +272,78 @@ var tasks = {
         error: error
       });
     });
+  },
+  // attachBuilderATETranslationHandler
+  attachBuilderATETranslationHandler: function attachBuilderATETranslationHandler() {
+    var buttons = document.querySelectorAll('.directorist-wpml-builder-ate-button');
+
+    _babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0___default()(buttons).map(function (button) {
+      button.addEventListener('click', handleBuilderATETranslationAction);
+    });
+  },
+  // openBuilderATETranslation
+  openBuilderATETranslation: function openBuilderATETranslation(context) {
+    var isLoading = _babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0___default()(context.classList).includes('directorist-is-loading');
+
+    if (isLoading) {
+      return;
+    }
+
+    var panel = context.closest('.directorist-wpml-builder-ate-panel');
+
+    if (!panel) {
+      return;
+    }
+
+    var directory_type_id = panel.getAttribute('data-directory-type-id');
+    var languageSelect = panel.querySelector('.directorist-wpml-builder-ate-panel__language');
+    var language_code = languageSelect ? languageSelect.value : '';
+
+    if (!directory_type_id || !language_code) {
+      alert('Please select a translation language.');
+      return;
+    }
+
+    var originalContent = context.innerHTML;
+    context.innerHTML = '<span class="spinner is-active"></span> Preparing ATE...';
+    context.classList.add('directorist-is-loading');
+    context.setAttribute('disabled', 'disabled');
+    var url = directory_builder_script_data.ajax_url;
+    var formData = {
+      action: 'prepare_directory_type_ate_translation',
+      directorist_nonce: directory_builder_script_data.directorist_nonce,
+      directory_type_id: directory_type_id,
+      translation_language_code: language_code,
+      return_url: window.location.href
+    };
+    var queryStrings = new URLSearchParams(formData).toString();
+    url = url + '?' + queryStrings;
+    fetch(url).then(function (response) {
+      return response.json();
+    }).then(function (response) {
+      context.classList.remove('directorist-is-loading');
+      context.removeAttribute('disabled');
+
+      if (!response.success) {
+        context.innerHTML = originalContent;
+        console.log({
+          response: response
+        });
+        alert(response.message);
+        return;
+      }
+
+      if (response.data && response.data.edit_link) {
+        window.location.href = response.data.edit_link;
+      }
+    }).catch(function (error) {
+      context.classList.remove('directorist-is-loading');
+      context.removeAttribute('disabled');
+      context.innerHTML = originalContent;
+      console.log({
+        error: error
+      });
+    });
   }
 }; // Init
 
@@ -281,6 +354,14 @@ function handleATETranslationAction(event) {
   var context = this;
   setTimeout(function () {
     tasks.openATETranslation(context, event);
+  }, 0);
+}
+
+function handleBuilderATETranslationAction(event) {
+  event.preventDefault();
+  var context = this;
+  setTimeout(function () {
+    tasks.openBuilderATETranslation(context);
   }, 0);
 }
 

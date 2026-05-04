@@ -7,6 +7,7 @@ import './admin-main';
 const tasks = {
     init: function() {
         this.setupTranslationLinksToDirectoryType();
+        this.attachBuilderATETranslationHandler();
     },
 
     // setupTranslationLinksToDirectoryType
@@ -195,6 +196,82 @@ const tasks = {
                 console.log( { error } );
             });
     },
+
+    // attachBuilderATETranslationHandler
+    attachBuilderATETranslationHandler: function() {
+        const buttons = document.querySelectorAll( '.directorist-wpml-builder-ate-button' );
+
+        [ ...buttons ].map( button => {
+            button.addEventListener( 'click', handleBuilderATETranslationAction );
+        });
+    },
+
+    // openBuilderATETranslation
+    openBuilderATETranslation: function( context ) {
+        const isLoading = [ ...context.classList ].includes( 'directorist-is-loading' );
+
+        if ( isLoading ) {
+            return;
+        }
+
+        const panel = context.closest( '.directorist-wpml-builder-ate-panel' );
+
+        if ( ! panel ) {
+            return;
+        }
+
+        const directory_type_id = panel.getAttribute( 'data-directory-type-id' );
+        const languageSelect    = panel.querySelector( '.directorist-wpml-builder-ate-panel__language' );
+        const language_code     = languageSelect ? languageSelect.value : '';
+
+        if ( ! directory_type_id || ! language_code ) {
+            alert( 'Please select a translation language.' );
+            return;
+        }
+
+        const originalContent = context.innerHTML;
+        context.innerHTML = '<span class="spinner is-active"></span> Preparing ATE...';
+        context.classList.add( 'directorist-is-loading' );
+        context.setAttribute( 'disabled', 'disabled' );
+
+        let url = directory_builder_script_data.ajax_url;
+        const formData = {
+            action: 'prepare_directory_type_ate_translation',
+            directorist_nonce: directory_builder_script_data.directorist_nonce,
+            directory_type_id,
+            translation_language_code: language_code,
+            return_url: window.location.href,
+        };
+
+        const queryStrings = new URLSearchParams( formData ).toString();
+        url = url + '?' + queryStrings;
+
+        fetch( url )
+            .then( response => response.json() )
+            .then( response => {
+                context.classList.remove( 'directorist-is-loading' );
+                context.removeAttribute( 'disabled' );
+
+                if ( ! response.success ) {
+                    context.innerHTML = originalContent;
+
+                    console.log( { response } );
+                    alert( response.message );
+                    return;
+                }
+
+                if ( response.data && response.data.edit_link ) {
+                    window.location.href = response.data.edit_link;
+                }
+            })
+            .catch( error => {
+                context.classList.remove( 'directorist-is-loading' );
+                context.removeAttribute( 'disabled' );
+                context.innerHTML = originalContent;
+
+                console.log( { error } );
+            });
+    },
 };
 
 // Init
@@ -207,5 +284,15 @@ function handleATETranslationAction( event ) {
 
     setTimeout( function() {
         tasks.openATETranslation( context, event )
+    }, 0 );
+}
+
+// handleBuilderATETranslationAction
+function handleBuilderATETranslationAction( event ) {
+    event.preventDefault();
+    const context = this;
+
+    setTimeout( function() {
+        tasks.openBuilderATETranslation( context )
     }, 0 );
 }
