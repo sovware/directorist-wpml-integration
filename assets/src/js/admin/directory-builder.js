@@ -7,6 +7,7 @@ import './admin-main';
 const tasks = {
     init: function() {
         this.setupTranslationLinksToDirectoryType();
+        this.mountBuilderATETranslationPanel();
         this.attachBuilderATETranslationHandler();
     },
 
@@ -199,10 +200,53 @@ const tasks = {
 
     // attachBuilderATETranslationHandler
     attachBuilderATETranslationHandler: function() {
-        const buttons = document.querySelectorAll( '.directorist-wpml-builder-ate-button' );
+        document.addEventListener( 'click', function( event ) {
+            const button = event.target.closest( '.directorist-wpml-builder-ate-button' );
 
-        [ ...buttons ].map( button => {
-            button.addEventListener( 'click', handleBuilderATETranslationAction );
+            if ( ! button ) {
+                return;
+            }
+
+            handleBuilderATETranslationAction.call( button, event );
+        });
+    },
+
+    // mountBuilderATETranslationPanel
+    mountBuilderATETranslationPanel: function() {
+        const panel = document.querySelector( '.directorist-wpml-builder-ate-panel' );
+
+        if ( ! panel ) {
+            return;
+        }
+
+        const mountPanel = function() {
+            const target = document.querySelector( '.directorist-directory-type-top-right' );
+
+            if ( ! target || target.contains( panel ) ) {
+                return;
+            }
+
+            target.insertBefore( panel, target.firstChild );
+            panel.classList.add( 'directorist-wpml-builder-ate-panel--mounted' );
+        };
+
+        mountPanel();
+
+        if ( panel.classList.contains( 'directorist-wpml-builder-ate-panel--mounted' ) ) {
+            return;
+        }
+
+        const observer = new MutationObserver( function() {
+            mountPanel();
+
+            if ( panel.classList.contains( 'directorist-wpml-builder-ate-panel--mounted' ) ) {
+                observer.disconnect();
+            }
+        });
+
+        observer.observe( document.body, {
+            childList: true,
+            subtree: true,
         });
     },
 

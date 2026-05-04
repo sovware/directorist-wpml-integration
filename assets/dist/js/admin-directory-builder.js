@@ -123,6 +123,7 @@ __webpack_require__.r(__webpack_exports__);
 var tasks = {
   init: function init() {
     this.setupTranslationLinksToDirectoryType();
+    this.mountBuilderATETranslationPanel();
     this.attachBuilderATETranslationHandler();
   },
   // setupTranslationLinksToDirectoryType
@@ -275,10 +276,51 @@ var tasks = {
   },
   // attachBuilderATETranslationHandler
   attachBuilderATETranslationHandler: function attachBuilderATETranslationHandler() {
-    var buttons = document.querySelectorAll('.directorist-wpml-builder-ate-button');
+    document.addEventListener('click', function (event) {
+      var button = event.target.closest('.directorist-wpml-builder-ate-button');
 
-    _babel_runtime_helpers_toConsumableArray__WEBPACK_IMPORTED_MODULE_0___default()(buttons).map(function (button) {
-      button.addEventListener('click', handleBuilderATETranslationAction);
+      if (!button) {
+        return;
+      }
+
+      handleBuilderATETranslationAction.call(button, event);
+    });
+  },
+  // mountBuilderATETranslationPanel
+  mountBuilderATETranslationPanel: function mountBuilderATETranslationPanel() {
+    var panel = document.querySelector('.directorist-wpml-builder-ate-panel');
+
+    if (!panel) {
+      return;
+    }
+
+    var mountPanel = function mountPanel() {
+      var target = document.querySelector('.directorist-directory-type-top-right');
+
+      if (!target || target.contains(panel)) {
+        return;
+      }
+
+      target.insertBefore(panel, target.firstChild);
+      panel.classList.add('directorist-wpml-builder-ate-panel--mounted');
+    };
+
+    mountPanel();
+
+    if (panel.classList.contains('directorist-wpml-builder-ate-panel--mounted')) {
+      return;
+    }
+
+    var observer = new MutationObserver(function () {
+      mountPanel();
+
+      if (panel.classList.contains('directorist-wpml-builder-ate-panel--mounted')) {
+        observer.disconnect();
+      }
+    });
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true
     });
   },
   // openBuilderATETranslation
