@@ -62,13 +62,10 @@ final class Directorist_WPML_Integration {
      * @return void
 	 */
     public function show_incompatibility_notice() {
-        $title       = __( 'Directorist Update is Incomplete', 'directorist-wpml-integration' );
-        $message     = __( '<b>Directorist WPML Integration</b> extension requires <b>Directorist '. DIRECTORIST_WPML_INTEGRATION_MIN_DIRECTORIST_VERSION_REQUIRMENT .'</b> or higher to work', 'directorist-wpml-integration' );
-
         ?>
         <div class="notice notice-error">
-            <h3><?php echo $title; ?></h3>
-            <p><?php echo $message; ?></p>
+            <h3><?php esc_html_e( 'Directorist Update is Incomplete', 'directorist-wpml-integration' ); ?></h3>
+            <p><?php echo wp_kses( __( '<b>Directorist WPML Integration</b> extension requires <b>Directorist '. DIRECTORIST_WPML_INTEGRATION_MIN_DIRECTORIST_VERSION_REQUIRMENT .'</b> or higher to work', 'directorist-wpml-integration' ), array( 'b' ) ); ?></p>
         </div>
         <?php
     }

@@ -1,61 +1,37 @@
 {
-  "name": "directorist-wpml-integration",
-  "version": "1.0.0",
-  "description": "",
-  "main": "pot.js",
-  "scripts": {
-    "dev": "webpack --config webpack.dev.js",
-    "dev-vue": "webpack --config webpack.dev.vue.js",
-    "prod": "node pot.js && webpack --config webpack.prod.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/syedgalib/directorist-wpml-integration.git"
-  },
-  "keywords": [],
-  "author": "syedgalib",
-  "license": "ISC",
-  "bugs": {
-    "url": "https://github.com/syedgalib/directorist-wpml-integration/issues"
-  },
-  "homepage": "https://github.com/syedgalib/directorist-wpml-integration#readme",
-  "dependencies": {
-    "node-sass": "^4.14.1",
-    "vue": "^2.6.11",
-    "vuex": "^3.5.1",
-    "webpack-rtl-plugin": "^2.0.0"
-  },
-  "devDependencies": {
-    "@babel/core": "^7.10.5",
-    "@babel/preset-env": "^7.10.4",
-    "@wordpress/babel-preset-default": "^5.0.0",
-    "@wordpress/scripts": "^16.1.2",
-    "autoprefixer": "^9.8.5",
-    "babel-loader": "^8.1.0",
-    "clean-webpack-plugin": "^3.0.0",
-    "css-loader": "^3.6.0",
-    "file-loader": "^6.0.0",
-    "filemanager-webpack-plugin": "^5.0.0",
-    "mini-css-extract-plugin": "^0.9.0",
-    "postcss-loader": "^3.0.0",
-    "resolve-url-loader": "^3.1.2",
-    "sass": "^1.29.0",
-    "sass-loader": "^9.0.2",
-    "style-loader": "^1.2.1",
-    "vue-loader": "^15.9.3",
-    "vue-template-compiler": "^2.6.11",
-    "webpack": "^4.46.0",
-    "webpack-cli": "^3.3.12",
-    "webpack-dev-server": "^3.11.0",
-    "webpack-merge": "^5.0.9",
-    "wp-pot": "^1.9.8"
-  },
-  "browserslist": [
-    "defaults",
-    "not ie < 11",
-    "last 2 versions",
-    "> 1%",
-    "iOS 7",
-    "last 3 iOS versions"
-  ]
+	"name": "wpmvc",
+	"version": "1.0.0",
+	"description": "",
+	"main": "webpack.config.js",
+	"scripts": {
+		"start": "wp-scripts start",
+		"start:hot": "wp-scripts start --hot",
+		"format": "wp-scripts format",
+		"minify": "wp-scripts build",
+		"compress": "webpack --config dev-tools/webpack.compress.js",
+		"git-compress": "webpack --config dev-tools/webpack.compress.git.js",
+		"fixtextdomain": "grunt fixtextdomain --gruntfile dev-tools/Gruntfile.js",
+		"grunt-build": "grunt build --gruntfile dev-tools/Gruntfile.js",
+		"grunt-finish": "grunt screen:finish --gruntfile dev-tools/Gruntfile.js",
+		"build": "npm run minify && npm run grunt-build && npm run compress && npm run grunt-finish"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/wpmvc/wpmvc.git"
+	},
+	"author": "",
+	"license": "ISC",
+	"bugs": {
+		"url": "https://github.com/wpmvc/wpmvc/issues"
+	},
+	"homepage": "https://github.com/wpmvc/wpmvc#readme",
+	"devDependencies": {
+		"@wordpress/scripts": "^26.3.0",
+		"filemanager-webpack-plugin": "^8.0.0",
+		"grunt": "^1.6.1",
+		"grunt-checktextdomain": "^1.0.1",
+		"grunt-contrib-clean": "^2.0.1",
+		"grunt-wp-i18n": "^1.0.3",
+		"load-grunt-tasks": "^5.1.0"
+	}
 }

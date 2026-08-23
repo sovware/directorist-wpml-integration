@@ -12,8 +12,36 @@
         <taxonomy translate="1">atbdp_listing_types</taxonomy>
     </taxonomies>
 
+    <!--
+        custom-term-fields for atbdp_listing_types (directory type) term meta:
+
+        - submission_form_fields  : translate - keeps listing form field labels
+          per language so editing the default language does not overwrite
+          translated label values (comp-4370).
+
+        - single_listings_contents : translate - keeps single listing page layout
+          and widget labels per language for the same reason (comp-4370).
+
+        - _default : copy - every language needs its own default directory type
+          flag so Directorist always has a valid default (comp-4354).
+    -->
+    <custom-term-fields>
+        <custom-term-field action="translate">submission_form_fields</custom-term-field>
+        <custom-term-field action="translate">single_listings_contents</custom-term-field>
+        <custom-term-field action="copy">_default</custom-term-field>
+    </custom-term-fields>
+
     <admin-texts>
         <key name="atbdp_option">
+            <!-- Page IDs (for ATE/CTE mapping to translated pages) - comp-4358 -->
+            <key name="search_result_page" type="post-ids" sub-type="page"/>
+            <key name="add_listing_page" type="post-ids" sub-type="page"/>
+            <key name="all_listing_page" type="post-ids" sub-type="page"/>
+            <key name="single_category_page" type="post-ids" sub-type="page"/>
+            <key name="single_location_page" type="post-ids" sub-type="page"/>
+            <key name="single_tag_page" type="post-ids" sub-type="page"/>
+            <key name="author_profile_page" type="post-ids" sub-type="page"/>
+            <key name="compare_listings_page" type="post-ids" sub-type="page"/>
             <!-- All Listings -->
             <key name="all_listing_title"/>
             <key name="listings_filter_button_text"/>
@@ -144,6 +172,17 @@
             <key name="login_meta_desc"/>
             <key name="homepage_meta_desc"/>
             <key name="search_result_meta_desc"/>
+            
+            <!-- Claim Listing extension -->
+            <key name="claim_widget_title"/>
+            <key name="claim_widget_description"/>
+            <key name="claim_now"/>
+            <key name="email_sub_new_claim"/>
+            <key name="email_tmpl_new_claim"/>
+            <key name="email_sub_approved_claim"/>
+            <key name="email_tmpl_approved_claim"/>
+            <key name="email_sub_declined_claim"/>
+            <key name="email_tmpl_declined_claim"/>
         </key>
     </admin-texts>
 
@@ -189,4 +228,121 @@
         <custom-field action="copy">_listing_type</custom-field>
         <custom-field action="copy">_admin_category_select</custom-field>
     </custom-fields>
+
+    <gutenberg-blocks>
+        <gutenberg-block type="directorist/search-listing" translate="1">
+            <key>search_bar_title</key>
+            <key>search_bar_sub_title</key>
+            <key>more_filters_text</key>
+            <key>reset_filters_text</key>
+            <key>apply_filters_text</key>
+        </gutenberg-block>
+
+        <gutenberg-block type="directorist/all-listing" translate="1">
+            <key>header_title</key>
+        </gutenberg-block>
+
+        <gutenberg-block type="directorist/search-result" translate="1">
+            <key>header_title</key>
+        </gutenberg-block>
+
+        <gutenberg-block type="directorist/category" translate="1">
+            <key>header_title</key>
+        </gutenberg-block>
+
+        <gutenberg-block type="directorist/location" translate="1">
+            <key>header_title</key>
+        </gutenberg-block>
+
+        <gutenberg-block type="directorist/tag" translate="1">
+            <key>header_title</key>
+        </gutenberg-block>
+
+        <gutenberg-block type="directorist/account-button" translate="1">
+            <key>title</key>
+            <key>text</key>
+        </gutenberg-block>
+
+        <gutenberg-block type="directorist/search-modal" translate="1">
+            <key>title</key>
+            <key>text</key>
+        </gutenberg-block>
+    </gutenberg-blocks>
+
+    <elementor-widgets>
+        <widget name="directorist_all_listing">
+            <fields>
+                <field>header_title</field>
+                <field type="taxonomy-ids" sub-type="atbdp_listing_types">type</field>
+                <field type="taxonomy-ids" sub-type="atbdp_listing_types">default_type</field>
+            </fields>
+        </widget>
+        <widget name="directorist_search_listing">
+            <fields>
+                <field>title</field>
+                <field>subtitle</field>
+                <field>search_btn_text</field>
+                <field>more_filter_btn_text</field>
+                <field>more_filter_reset_btn_text</field>
+                <field>more_filter_search_btn_text</field>
+                <field type="taxonomy-ids" sub-type="atbdp_listing_types">type</field>
+                <field type="taxonomy-ids" sub-type="atbdp_listing_types">default_type</field>
+            </fields>
+        </widget>
+        <widget name="directorist_search_result">
+            <fields>
+                <field>header_title</field>
+                <field type="taxonomy-ids" sub-type="atbdp_listing_types">type</field>
+                <field type="taxonomy-ids" sub-type="atbdp_listing_types">default_type</field>
+            </fields>
+        </widget>
+        <widget name="directorist_category">
+            <fields>
+                <field>header_title</field>
+                <field type="taxonomy-ids" sub-type="at_biz_dir-category">cat</field>
+            </fields>
+        </widget>
+        <widget name="directorist_location">
+            <fields>
+                <field>header_title</field>
+                <field type="taxonomy-ids" sub-type="at_biz_dir-location">loc</field>
+            </fields>
+        </widget>
+        <widget name="directorist_tag">
+            <fields>
+                <field>header_title</field>
+                <field type="taxonomy-ids" sub-type="at_biz_dir-tags">tag</field>
+            </fields>
+        </widget>
+        <widget name="directorist_user_login">
+            <fields>
+                <field>signin_username_label</field>
+                <field>signin_button_label</field>
+                <field>recovery_password_label</field>
+                <field>recovery_password_description</field>
+                <field>recovery_password_email_label</field>
+                <field>recovery_password_email_placeholder</field>
+                <field>recovery_password_button_label</field>
+                <field>signup_label</field>
+                <field>signup_linking_text</field>
+                <field>author_role_label</field>
+                <field>user_role_label</field>
+                <field>username_label</field>
+                <field>password_label</field>
+                <field>email_label</field>
+                <field>website_label</field>
+                <field>firstname_label</field>
+                <field>lastname_label</field>
+                <field>bio_label</field>
+                <field>privacy_label</field>
+                <field>privacy_linking_text</field>
+                <field>terms_label</field>
+                <field>terms_linking_text</field>
+                <field>signup_button_label</field>
+                <field>signin_message</field>
+                <field>signin_linking_text</field>
+                <field>active_form</field>
+            </fields>
+        </widget>
+    </elementor-widgets>
 </wpml-config>

@@ -96,10 +96,7 @@ class Listings_Actions {
             return;
         }
 
-        $directory_type_id = ( isset( $_REQUEST['directory_type'] ) ) ? sanitize_text_field( $_REQUEST['directory_type'] ) : 0;
-
-        $log[ 'post_id' ] = $post_id;
-        $log[ 'directory_type_id_{_REQUEST}' ] = $directory_type_id;
+        $directory_type_id = isset( $_REQUEST['directory_type'] ) ? absint( wp_unslash( $_REQUEST['directory_type'] ) ) : 0;
 
         if ( empty( $directory_type_id ) ) {
             $directory_type_meta       = get_post_meta( $post_id, '_directory_type', true );
@@ -108,17 +105,34 @@ class Listings_Actions {
             $directory_type_id         = ( ! is_wp_error( $directory_type_term ) && ! empty( $directory_type_term ) ) ? $directory_type_term[0]->term_id : $default_directory_type_id;
         }
 
+        $directory_type_id = absint( $directory_type_id );
+
+        if ( empty( $directory_type_id ) ) {
+            return;
+        }
+
+        update_post_meta( $post_id, '_directory_type', $directory_type_id );
+        wp_set_object_terms( $post_id, $directory_type_id, ATBDP_DIRECTORY_TYPE );
+
         $listings_translations       = WPML_Helper::get_element_translations( $post_id, ATBDP_POST_TYPE );
         $directory_type_translations = WPML_Helper::get_element_translations( $directory_type_id, ATBDP_DIRECTORY_TYPE );
 
         if ( ! empty( $listings_translations ) ) {
             foreach( $listings_translations as $language_key => $listings_translation ) {
-                $listing_id        = $listings_translation->element_id;
-                $directory_type_id = ( ! empty( $directory_type_translations ) && ! empty( $directory_type_translations[ $language_key ] ) ) ? $directory_type_translations[ $language_key ]->term_id : 0;
-                $directory_type_id = ( ! empty( $directory_type_id ) ) ?  ( int ) $directory_type_id : '';
-                
-                update_post_meta( $listing_id, '_directory_type', $directory_type_id );
-                wp_set_object_terms( $listing_id, $directory_type_id, ATBDP_DIRECTORY_TYPE );
+                $listing_id = (int) $listings_translation->element_id;
+
+                if ( $listing_id === (int) $post_id || empty( $directory_type_translations[ $language_key ] ) ) {
+                    continue;
+                }
+
+                $translated_directory_type_id = (int) $directory_type_translations[ $language_key ]->term_id;
+
+                if ( empty( $translated_directory_type_id ) ) {
+                    continue;
+                }
+
+                update_post_meta( $listing_id, '_directory_type', $translated_directory_type_id );
+                wp_set_object_terms( $listing_id, $translated_directory_type_id, ATBDP_DIRECTORY_TYPE );
             }
         }
 

@@ -1,12 +1,12 @@
 === Directorist - WPML Integration ===
-Contributors:      wpwax, rafiq91
-Tags:              directory, directorist, directorist wpml, wpml
+Contributors: wpwax
+Tags: directory, directorist, directorist wpml, wpml
 Requires at least: 5.7
-Tested up to:      5.9
-Requires PHP:      7.0
-Stable tag:        0.1.0
-License:           GPL-2.0-or-later
-License URI:       https://www.gnu.org/licenses/gpl-2.0.html
+Tested up to: 6.9
+Requires PHP: 7.4
+Stable tag: 2.2.1
+License: GPLv3
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
 Directorist-WPML integration plugin uses automatic translation to translate your directory website content instantly and lets you check and edit the translations just before publishing them on your directory site.
 
@@ -58,8 +58,23 @@ If you want to contribute to the project, you’re most welcome to make it happe
 2. Activate the plugin through the 'Plugins' screen in WordPress if installed manually or through the WordPress plugins screen.
 3. Use the `Add New` button in the Block Editor toolbar when needed.
 
-== Changelog ==
+== Changelogs == 
+2.2.1 - Feb 05, 2026
 
-= 0.1.0 - April 19, 2022 =
+* Added: Built‑in synchronization of Directorist category `_directory_type` meta across WPML languages, based on WPML’s recommended workaround (no extra code snippet needed).
+* Added: WPML config to copy the `_default` directory type flag across translations, ensuring a proper default directory type per language.
+* Improved: Overall WPML compatibility for directory types, categories, search form fields, and settings strings on WordPress 6.8 and the latest WPML versions.
+* Fixed: New translatable data is available for translation and displays correctly on the front‑end.
+* Fixed: Data saved in posts remains translatable and displays correctly on the front‑end.
+* Fixed: Data saved in taxonomies remains translatable and displays correctly on the front‑end.
+* Fixed: Front‑end strings are translatable with WPML String Translation and display correctly.
+* Fixed: Email sending process so content is translated and sent in the user’s preferred language.
 
-* Release
+2.1.4 - Jun 09, 2025
+
+* Added:  Directorist as a required dependency
+* Added: Translation support for Claim Listing Settings
+
+2.0.0 - Nov 17, 2024
+
+* Added: Directorist compatibility

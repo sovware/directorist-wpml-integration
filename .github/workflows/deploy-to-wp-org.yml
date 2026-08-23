@@ -1,0 +1,60 @@
+name: Deploy to wp org
+
+on:
+  release:
+    types:
+      - released
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Fix apt metadata change issue
+        run: sudo apt-get update --allow-releaseinfo-change
+
+      - name: Install SVN
+        run: sudo apt-get install -y subversion
+
+      - name: Setup Node.js 18.18.2
+        uses: actions/setup-node@v2
+        with:
+          node-version: "18.18.2"
+
+      - name: Install yarn globally
+        run: npm install --global yarn
+
+      - name: Install yarn dependencies
+        run: yarn install
+
+      - name: Compile Scripts
+        run: yarn minify
+
+      - name: Fix Text Domain
+        run: yarn fixtextdomain
+
+      - name: Build plugin
+        run: yarn git-compress
+
+      - name: Deploy to wp org
+        uses: 10up/action-wordpress-plugin-deploy@stable
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+          SLUG: directorist-wpml-integration
+          BUILD_DIR: directorist-wpml-integration
+
+      - name: Create zip file
+        run: |
+          tag_name=$(git describe --tags --abbrev=0)
+          zip -r "directorist-wpml-integration.${tag_name}.zip" directorist-wpml-integration
+
+      - name: Upload zip file as a release asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: directorist-wpml-integration*.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
