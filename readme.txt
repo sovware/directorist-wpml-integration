@@ -3,7 +3,7 @@ Contributors: wpwax
 Tags: directory, directorist, multilingual, wpml
 Requires at least: 6.0
 Tested up to: 7.0
-Stable tag: 3.0.0
+Stable tag: 2.2.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -59,7 +59,7 @@ Recommended WPML add-ons:
 
 == Compatibility Testing ==
 
-Version 3.0.0 was tested with:
+Version 2.2.2 was tested with:
 
 * WordPress 7.0.2
 * PHP 8.2.29
@@ -108,7 +108,7 @@ Use WPML Translation Dashboard and ATE for listings, directory builder packages,
 
 == Changelog ==
 
-= 3.0.0 =
+= 2.2.2 =
 * Breaking: Moved Directory Builder visual translation from raw translated term meta and mixed string workflows to dedicated WPML Translation Dashboard/ATE packages.
 * Added: Directory Builder labels, placeholders, sections, layouts, field options, validation messages, dialogs, and controls are exposed in their directory-specific ATE package.
 * Added: Static Directorist shortcode UI text is included in the matching page ATE job for Search Home, Add Listing, All Listings, Search Result, taxonomy, account, dashboard, checkout, and related Directorist pages.
@@ -143,5 +143,5 @@ Use WPML Translation Dashboard and ATE for listings, directory builder packages,
 
 == Upgrade Notice ==
 
-= 3.0.0 =
+= 2.2.2 =
 Directory Builder, page UI, and Settings UI translations now use WPML Translation Dashboard and ATE jobs/packages. Back up the site before upgrading and refresh existing translation jobs so they include the new visual-string packages and admin label coverage.

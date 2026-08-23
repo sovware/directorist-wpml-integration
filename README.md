@@ -29,7 +29,7 @@ The current repair pass manually translated 26 ATE-visible Builder segments and 
 
 ## Changelog (short)
 
-- **3.0.0 (2026-07-20)**
+- **2.2.2 (2026-07-20)**
   - Moved Directory Builder visual translation to dedicated WPML Translation Dashboard/ATE packages.
   - Added page-specific Directorist shortcode UI text to page ATE jobs.
   - Added Directorist Settings UI and admin menu translation coverage using WPML package data.
