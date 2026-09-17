@@ -166,6 +166,113 @@ $second_pass = $apply_translations->invoke( $package, $source, 'submission_form_
 assert_same( $updated_german, $second_pass, 'Repeated package repair must be idempotent.' );
 assert_same( $source_before, $source, 'Repeated repair must leave source-language builder data unchanged.' );
 
+// A real header stores both frontend labels and builder control captions.
+$header         = array(
+	array(
+		'label'        => 'Quick widgets',
+		'placeholders' => array(
+			array(
+				'label'           => 'Top Right',
+				'selectedWidgets' => array(
+					array(
+						'widget_name' => 'bookmark',
+						'label'       => 'Bookmark',
+						'options'     => array(
+							'title'  => 'Bookmark Settings',
+							'fields' => array(
+								'label'    => array(
+									'label' => 'Label',
+									'value' => 'Bookmark',
+								),
+								'icon'     => array(
+									'label' => 'Icon',
+									'value' => 'la la-heart-o',
+								),
+								'position' => array(
+									'label'   => 'Position',
+									'options' => array(
+										array(
+											'label' => 'Top Left',
+											'value' => 'left',
+										),
+									),
+								),
+							),
+						),
+					),
+				),
+			),
+		),
+	),
+	array(
+		'label'           => 'Listing Title',
+		'selectedWidgets' => array(),
+	),
+);
+$header_before  = $header;
+$header_strings = $package->get_translatable_meta_string_map( 'single_listing_header', $header );
+$widget_label   = 'builder_single_listing_header__0__placeholders__0__selectedwidgets__0__label';
+$option_value   = 'builder_single_listing_header__0__placeholders__0__selectedwidgets__0__options__fields__label__value';
+assert_same(
+	array(
+		$widget_label => 'Bookmark',
+		$option_value => 'Bookmark',
+	),
+	$header_strings,
+	'Header packages must contain frontend labels without positions, settings titles or control captions.'
+);
+
+$legacy_translations = array(
+	$widget_label => 'Bladwijzer',
+	$option_value => 'Bladwijzer',
+	'builder_single_listing_header__0__placeholders__0__label' => 'Wrong position translation',
+	'builder_single_listing_header__0__placeholders__0__selectedwidgets__0__options__title' => 'Wrong settings translation',
+	'builder_single_listing_header__0__placeholders__0__selectedwidgets__0__options__fields__icon__label' => 'Wrong control translation',
+);
+$translated_header   = $package->apply_translatable_meta_string_map( 'single_listing_header', $header, $legacy_translations );
+$expected_header     = $header;
+$expected_header[0]['placeholders'][0]['selectedWidgets'][0]['label']                               = 'Bladwijzer';
+$expected_header[0]['placeholders'][0]['selectedWidgets'][0]['options']['fields']['label']['value'] = 'Bladwijzer';
+assert_same( $expected_header, $translated_header, 'Legacy jobs must not apply translations to internal header controls.' );
+assert_same( $header_before, $header, 'Collection and translation must not mutate the source header.' );
+
+// Filter by structure, never by English words that may be genuine content.
+$custom_form = array(
+	'fields' => array(
+		'custom' => array(
+			'label'       => 'Icon',
+			'placeholder' => 'Top Left',
+			'options'     => array(
+				array(
+					'option_label' => 'Bookmark Settings',
+					'option_value' => 'settings',
+				),
+			),
+		),
+	),
+);
+assert_same( array( 'Icon', 'Top Left', 'Bookmark Settings' ), array_values( $package->get_translatable_meta_string_map( 'submission_form_fields', $custom_form ) ), 'Real form labels, placeholders and choices must remain translatable even when they match control captions.' );
+$direct_header = array(
+	array(
+		'label'           => 'Top Left',
+		'selectedWidgets' => array(
+			array(
+				'label'   => 'Custom action',
+				'options' => array(
+					'title'  => 'Custom settings',
+					'fields' => array(
+						'label' => array(
+							'label' => 'Caption',
+							'value' => 'Custom action',
+						),
+					),
+				),
+			),
+		),
+	),
+);
+assert_same( array( 'Custom action', 'Custom action' ), array_values( $package->get_translatable_meta_string_map( 'single_listing_header', $direct_header ) ), 'Direct placeholder widgets must retain custom frontend labels and omit builder captions.' );
+
 $top_level_string = $build_top_level_string->invoke( $package, 'pending_confirmation_msg', 'Listing Submission: Pending confirmation message', 'Thank you for your submission.' );
 assert_same( 'top_meta__pending_confirmation_msg', $top_level_string['name'], 'Top-level term meta string names must remain readable and stable.' );
 assert_same( true, $is_top_level_value->invoke( $package, 'pending_confirmation_msg', 'Thank you for your submission.' ), 'Native visual top-level term meta must be exposed.' );

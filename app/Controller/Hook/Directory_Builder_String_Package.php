@@ -2335,7 +2335,7 @@ class Directory_Builder_String_Package {
                 continue;
             }
 
-            if ( ! $this->is_translatable_string( $key, $value, $current_path ) ) {
+            if ( ! $this->is_translatable_string( $key, $value, $current_path, $meta_key ) ) {
                 continue;
             }
 
@@ -2376,7 +2376,7 @@ class Directory_Builder_String_Package {
                 continue;
             }
 
-            if ( ! $this->is_translatable_string( $key, $value, $current_path ) ) {
+            if ( ! $this->is_translatable_string( $key, $value, $current_path, $meta_key ) ) {
                 continue;
             }
 
@@ -2976,7 +2976,7 @@ class Directory_Builder_String_Package {
                 continue;
             }
 
-            if ( ! $this->is_translatable_string( $key, $value, $current_path ) ) {
+            if ( ! $this->is_translatable_string( $key, $value, $current_path, $meta_key ) ) {
                 continue;
             }
 
@@ -3016,11 +3016,13 @@ class Directory_Builder_String_Package {
     /**
      * Check whether a scalar value should be exposed for translation.
      *
-     * @param string|int $key   Array key.
-     * @param mixed      $value Value.
+     * @param string|int $key      Array key.
+     * @param mixed      $value    Value.
+     * @param array      $path     Nested array path.
+     * @param string     $meta_key Builder meta key.
      * @return bool
      */
-    private function is_translatable_string( $key, $value, $path = [] ) {
+    private function is_translatable_string( $key, $value, $path = [], $meta_key = '' ) {
         if ( ! is_string( $value ) || '' === trim( $value ) ) {
             return false;
         }
@@ -3043,6 +3045,22 @@ class Directory_Builder_String_Package {
 
         if ( array_intersect( [ 'conditional_logic', 'conditions', 'show_if' ], $path ) ) {
             return false;
+        }
+
+        if ( 'single_listing_header' === $meta_key ) {
+            $widget_index = array_search( 'selectedwidgets', $path, true );
+
+            // Placeholder labels describe builder positions, not listing content.
+            if ( 'label' === $key && false === $widget_index ) {
+                return false;
+            }
+
+            // Widget options contain control captions and settings, except for
+            // the editable values used by frontend labels. Keep the widget's
+            // own label too: Directorist renders it directly on the listing.
+            if ( false !== $widget_index && isset( $path[ $widget_index + 2 ] ) && 'options' === $path[ $widget_index + 2 ] ) {
+                return count( $path ) === $widget_index + 6 && 'value' === $key && $this->is_visual_builder_option_value_path( $path );
+            }
         }
 
         if ( 'value' === $key && $this->is_visual_builder_option_value_path( $path ) ) {
@@ -3157,16 +3175,12 @@ class Directory_Builder_String_Package {
      * @return bool
      */
     private function is_visual_builder_option_value_path( array $path ) {
-        if ( ! in_array( 'options', $path, true ) ) {
+        $option_path = array_slice( $path, -4 );
+        if ( count( $option_path ) !== 4 || 'options' !== $option_path[0] || 'fields' !== $option_path[1] || 'value' !== $option_path[3] ) {
             return false;
         }
 
-        $fields_index = array_search( 'fields', $path, true );
-        if ( false === $fields_index ) {
-            return false;
-        }
-
-        $field_name = isset( $path[ $fields_index + 1 ] ) ? $path[ $fields_index + 1 ] : '';
+        $field_name = $option_path[2];
 
         return in_array(
             $field_name,

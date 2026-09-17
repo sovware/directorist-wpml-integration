@@ -22,6 +22,7 @@ class Listings_Actions {
         add_action( 'post_updated', [ $this, 'update_directory_type_after_listing_update' ], 20, 1 );
         add_filter( 'wpml_pro_translation_completed', [ $this, 'update_directory_type_after_listing_translation' ], 20, 3 );
         add_action( 'save_post_at_biz_dir', [ $this, 'sync_listing_ui_strings_on_save' ], 40, 3 );
+        add_action( 'wpml_pb_register_all_strings_for_translation', [ $this, 'sync_listing_ui_strings_before_translation' ], 40 );
         add_action( 'directorist_after_update_directory_type', [ $this, 'sync_directory_listing_ui_strings' ], 40, 1 );
     }
 
@@ -73,6 +74,22 @@ class Listings_Actions {
         }
 
         $this->sync_listing_ui_strings( (int) $post_id );
+    }
+
+    /**
+     * Refresh stored listing UI text before WPML builds a new translation package.
+     *
+     * Existing listings may still contain captions collected by an older version.
+     *
+     * @param \WP_Post $post Source post being sent for translation.
+     * @return void
+     */
+    public function sync_listing_ui_strings_before_translation( $post ) {
+        if ( ! $post instanceof \WP_Post || ATBDP_POST_TYPE !== $post->post_type ) {
+            return;
+        }
+
+        $this->sync_listing_ui_strings( $post->ID );
     }
 
     /**
@@ -353,6 +370,9 @@ class Listings_Actions {
         $strings = $this->collect_single_listing_ui_strings( $layouts['header'], $layouts['contents'], $layouts['form'] );
 
         if ( empty( $strings ) ) {
+            if ( delete_post_meta( $listing_id, self::UI_META_KEY ) ) {
+                $this->mark_listing_translations_need_update( $listing_id );
+            }
             return;
         }
 
