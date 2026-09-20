@@ -200,6 +200,12 @@ $header         = array(
 							),
 						),
 					),
+					array( 'widget_name' => 'title', 'label' => 'Listing Title' ),
+					array( 'widget_name' => 'badges', 'label' => 'Badges' ),
+					array( 'widget_name' => 'price', 'label' => 'Pricing' ),
+					array( 'widget_name' => 'ratings_count', 'label' => 'Rating' ),
+					array( 'widget_name' => 'category', 'label' => 'Category' ),
+					array( 'widget_name' => 'slider', 'label' => 'Listing Image/Slider' ),
 				),
 			),
 		),
@@ -220,6 +226,22 @@ assert_same(
 	),
 	$header_strings,
 	'Header packages must contain frontend labels without positions, settings titles or control captions.'
+);
+
+$action_header = array(
+	array(
+		'selectedWidgets' => array(
+			array( 'widget_name' => 'back', 'label' => 'Back' ),
+			array( 'widget_name' => 'bookmark', 'label' => 'Bookmark' ),
+			array( 'widget_name' => 'share', 'label' => 'Share' ),
+			array( 'widget_name' => 'report', 'label' => 'Report' ),
+		),
+	),
+);
+assert_same(
+	array( 'Back', 'Bookmark', 'Share', 'Report' ),
+	array_values( $package->get_translatable_meta_string_map( 'single_listing_header', $action_header ) ),
+	'Only header action widgets whose root labels render on the frontend must enter ATE.'
 );
 
 $legacy_translations = array(
@@ -257,7 +279,8 @@ $direct_header = array(
 		'label'           => 'Top Left',
 		'selectedWidgets' => array(
 			array(
-				'label'   => 'Custom action',
+				'widget_name' => 'custom_action',
+				'label'       => 'Custom action',
 				'options' => array(
 					'title'  => 'Custom settings',
 					'fields' => array(
@@ -271,7 +294,7 @@ $direct_header = array(
 		),
 	),
 );
-assert_same( array( 'Custom action', 'Custom action' ), array_values( $package->get_translatable_meta_string_map( 'single_listing_header', $direct_header ) ), 'Direct placeholder widgets must retain custom frontend labels and omit builder captions.' );
+assert_same( array( 'Custom action' ), array_values( $package->get_translatable_meta_string_map( 'single_listing_header', $direct_header ) ), 'Unknown widget captions must stay out of ATE while explicit frontend option values remain translatable.' );
 
 $top_level_string = $build_top_level_string->invoke( $package, 'pending_confirmation_msg', 'Listing Submission: Pending confirmation message', 'Thank you for your submission.' );
 assert_same( 'top_meta__pending_confirmation_msg', $top_level_string['name'], 'Top-level term meta string names must remain readable and stable.' );
