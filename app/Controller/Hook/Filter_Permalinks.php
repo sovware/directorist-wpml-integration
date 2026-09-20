@@ -20,6 +20,7 @@ class Filter_Permalinks {
         
         add_filter( 'atbdp_checkout_page_url', [ $this, 'filter_checkout_page_url' ], 20, 3 );
         add_filter( 'atbdp_payment_receipt_page_url', [ $this, 'filter_payment_receipt_page_url' ], 20, 3 );
+        add_filter( 'atbdp_add_listing_page_url', [ $this, 'filter_add_listing_page_url' ], 20, 3 );
         add_filter( 'atbdp_search_result_page_url', [ $this, 'filter_search_result_page_url' ], 20, 1 );
         add_filter( 'atbdp_edit_listing_page_url', [ $this, 'filter_edit_listing_page_url' ], 20, 3 );
         add_filter( 'atbdp_author_profile_page_url', [ $this, 'filter_author_profile_page_url' ], 20, 4 );
@@ -547,6 +548,66 @@ class Filter_Permalinks {
         }
 
         return $url;
+    }
+
+    /**
+     * Filter Add Listing Page URL.
+     *
+     * Directorist's permalink helper reads the source-language page option
+     * directly. Resolve that page through WPML so pricing-plan actions stay on
+     * the translated Add Listing page, while preserving any plan/query values
+     * already attached to the URL.
+     *
+     * @param string $url     Add Listing URL.
+     * @param int    $page_id Source Add Listing page ID when provided.
+     * @param int    $plan_id Optional pricing plan ID.
+     * @return string
+     */
+    public function filter_add_listing_page_url( $url = '', $page_id = 0, $plan_id = 0 ) {
+        if ( ! has_filter( 'wpml_object_id' ) || is_admin() ) {
+            return $url;
+        }
+
+        $source_page_id = (int) $page_id;
+        if ( $source_page_id <= 0 ) {
+            $source_page_id = (int) get_directorist_option( 'add_listing_page' );
+        }
+
+        if ( $source_page_id <= 0 ) {
+            return $url;
+        }
+
+        $current_language = apply_filters( 'wpml_current_language', null );
+        if ( empty( $current_language ) ) {
+            return $url;
+        }
+
+        $translated_page_id = apply_filters(
+            'wpml_object_id',
+            $source_page_id,
+            'page',
+            false,
+            $current_language
+        );
+
+        if ( empty( $translated_page_id ) || ! get_post_status( $translated_page_id ) ) {
+            return $url;
+        }
+
+        $translated_url = get_permalink( (int) $translated_page_id );
+        if ( ! $translated_url ) {
+            return $url;
+        }
+
+        $query = wp_parse_url( $url, PHP_URL_QUERY );
+        if ( is_string( $query ) && '' !== $query ) {
+            parse_str( $query, $query_args );
+            if ( ! empty( $query_args ) ) {
+                $translated_url = add_query_arg( $query_args, $translated_url );
+            }
+        }
+
+        return $translated_url;
     }
 
     /**

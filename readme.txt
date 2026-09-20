@@ -3,7 +3,7 @@ Contributors: wpwax
 Tags: directory, directorist, multilingual, wpml
 Requires at least: 6.0
 Tested up to: 7.1
-Stable tag: 2.2.3
+Stable tag: 2.2.4
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -107,6 +107,10 @@ Yes. Translate the Directorist pages selected in Directorist settings so WPML ca
 Use WPML Translation Dashboard and ATE for listings, directory builder packages, pages, page-specific Directorist UI text, and Settings UI packages. WPML String Translation remains responsible for regular Directorist gettext strings and any settings or email strings that do not belong to a package/page ATE job.
 
 == Changelog ==
+
+= 2.2.4 =
+* Fixed: Pricing-plan actions on translated Add Listing pages now keep visitors on the matching WPML page instead of falling back to the language home URL.
+* Fixed: Nested directory attributes no longer trigger array-to-string PHP warnings while Directorist page UI strings are collected.
 
 = 2.2.3 =
 * Fixed: Completed target-language Single Listing Header action labels remain intact when Directorist reads translated directory metadata through the normal runtime filter.
