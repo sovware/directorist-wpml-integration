@@ -26,10 +26,18 @@ namespace {
 	}
 
 	function get_post_meta( $post_id, $key, $single = false ) {
+		if ( '_directorist_wpml_page_ui_strings' === $key ) {
+			return isset( $GLOBALS['listing_ui_meta'][ $post_id ] ) ? $GLOBALS['listing_ui_meta'][ $post_id ] : '';
+		}
 		return isset( $GLOBALS['listing_meta'][ $post_id ] ) ? $GLOBALS['listing_meta'][ $post_id ] : '';
 	}
 
 	function update_post_meta( $post_id, $key, $value ) {
+		if ( '_directorist_wpml_page_ui_strings' === $key ) {
+			$GLOBALS['listing_ui_meta'][ $post_id ] = $value;
+			++$GLOBALS['ui_meta_writes'];
+			return true;
+		}
 		$GLOBALS['listing_meta'][ $post_id ] = (int) $value;
 	}
 
@@ -69,8 +77,45 @@ namespace {
 		return 'UTF-8';
 	}
 
-	function add_action() {
+	function add_action( $hook, $callback = null ) {
+		$GLOBALS['registered_actions'][ $hook ] = $callback;
 		return true;
+	}
+
+	class WP_Post {
+		public $ID;
+		public $post_type;
+
+		public function __construct( $id, $post_type = ATBDP_POST_TYPE ) {
+			$this->ID        = $id;
+			$this->post_type = $post_type;
+		}
+	}
+
+	function delete_post_meta( $post_id, $key ) {
+		if ( ! isset( $GLOBALS['listing_ui_meta'][ $post_id ] ) ) {
+			return false;
+		}
+		unset( $GLOBALS['listing_ui_meta'][ $post_id ] );
+		++$GLOBALS['ui_meta_writes'];
+		return true;
+	}
+
+	function maybe_unserialize( $value ) {
+		return $value;
+	}
+
+	class Listing_UI_Test_Database {
+		public $termmeta = 'termmeta';
+		public $layouts  = array();
+
+		public function prepare( $query, $term_id, $meta_key ) {
+			return $meta_key;
+		}
+
+		public function get_var( $meta_key ) {
+			return isset( $this->layouts[ $meta_key ] ) ? $this->layouts[ $meta_key ] : array();
+		}
 	}
 
 	function add_filter() {
@@ -117,7 +162,7 @@ namespace Directorist_WPML_Integration\Helper {
 				127 => 'en', 154 => 'en', 184 => 'fr', 185 => 'fr', 198 => 'de', 200 => 'de',
 			];
 
-			return isset( $languages[ $element_id ] ) ? (object) [ 'language_code' => $languages[ $element_id ] ] : false;
+			return isset( $languages[ $element_id ] ) ? (object) [ 'language_code' => $languages[ $element_id ], 'source_language_code' => 'en' === $languages[ $element_id ] ? null : 'en' ] : false;
 		}
 	}
 }
@@ -185,8 +230,10 @@ namespace {
 				[
 					'placeholderKey' => 'actions',
 					'selectedWidgets' => [
-						[ 'widget_name' => 'existing_widget', 'widget_key' => 'existing-widget', 'label' => 'Existing Action' ],
-						[ 'widget_name' => 'future_widget', 'widget_key' => 'future-widget', 'label' => 'Future Action' ],
+						[ 'widget_name' => 'bookmark', 'widget_key' => 'bookmark', 'label' => 'Bookmark' ],
+						[ 'widget_name' => 'share', 'widget_key' => 'share', 'label' => 'Share' ],
+						[ 'widget_name' => 'title', 'widget_key' => 'title', 'label' => 'Listing Title' ],
+						[ 'widget_name' => 'badges', 'widget_key' => 'badges', 'label' => 'Badges' ],
 					],
 				],
 			],
@@ -231,8 +278,8 @@ namespace {
 
 	$source_ui_strings = $collect_listing_ui_strings->invoke( $listings, $header, $contents, $form );
 	$expected_values   = [
-		'Existing Action',
-		'Future Action',
+		'Bookmark',
+		'Share',
 		'Custom Content Label',
 		'Custom content body',
 		'Existing Section',
@@ -248,6 +295,7 @@ namespace {
 	foreach ( $expected_values as $expected_value ) {
 		assert_same( true, in_array( $expected_value, $source_ui_strings, true ), 'Every active or future layout string must enter the listing ATE inventory dynamically.' );
 	}
+	assert_same( false, in_array( 'Badges', $source_ui_strings, true ), 'Internal header widget captions must stay out of the listing ATE inventory.' );
 
 	$translated_ui_strings = [];
 	foreach ( $source_ui_strings as $key => $value ) {
@@ -266,9 +314,45 @@ namespace {
 		assert_same( $value, $translated_strings[ $key ], 'Every collected listing UI string must accept any target-language ATE value.' );
 	}
 
-	assert_same( 'future_widget', $translated_layouts['header'][0]['placeholders'][0]['selectedWidgets'][1]['widget_name'], 'Widget identities must never be translated.' );
+	assert_same( 'share', $translated_layouts['header'][0]['placeholders'][0]['selectedWidgets'][1]['widget_name'], 'Widget identities must never be translated.' );
 	assert_same( 'custom-choice', $translated_layouts['form']['fields']['choice']['field_key'], 'Field keys must never be translated.' );
 	assert_same( 'first', $translated_layouts['form']['fields']['choice']['options'][0]['option_value'], 'Option values must never be translated.' );
+
+	// Existing listings must be refreshed before WPML reads their custom fields.
+	$GLOBALS['wpdb']            = new Listing_UI_Test_Database();
+	$GLOBALS['wpdb']->layouts   = array(
+		'single_listing_header'    => $header,
+		'single_listings_contents' => $contents,
+		'submission_form_fields'   => $form,
+	);
+	$GLOBALS['listing_ui_meta'] = array(
+		127 => array( 'stale_control' => 'Bookmark Settings' ),
+		184 => array( 'translated_label' => 'Favori' ),
+	);
+	$GLOBALS['ui_meta_writes']  = 0;
+	$hook_listings              = new Listings_Actions();
+	$callback                   = $GLOBALS['registered_actions']['wpml_pb_register_all_strings_for_translation'];
+	$callback( new WP_Post( 127 ) );
+	$expected_inventory = $source_ui_strings;
+	ksort( $expected_inventory );
+	assert_same( $expected_inventory, $GLOBALS['listing_ui_meta'][127], 'Sending an existing listing must replace stale UI metadata with the current inventory.' );
+	$callback( new WP_Post( 127 ) );
+	assert_same( 1, $GLOBALS['ui_meta_writes'], 'Preparing an unchanged listing again must not rewrite its metadata.' );
+	$callback( new WP_Post( 184 ) );
+	$callback( new WP_Post( 127, 'page' ) );
+	$callback(
+		(object) array(
+			'ID'        => 127,
+			'post_type' => ATBDP_POST_TYPE,
+		)
+	);
+	assert_same( 1, $GLOBALS['ui_meta_writes'], 'Translated listings, pages and non-post packages must be left untouched.' );
+	assert_same( array( 'translated_label' => 'Favori' ), $GLOBALS['listing_ui_meta'][184], 'Existing translated listing text must be preserved.' );
+	$GLOBALS['wpdb']->layouts = array( 'single_listing_header' => array( array( 'label' => 'Top Left' ) ) );
+	$callback( new WP_Post( 127 ) );
+	assert_same( false, isset( $GLOBALS['listing_ui_meta'][127] ), 'An empty frontend inventory must remove old control-only metadata.' );
+	$callback( new WP_Post( 127 ) );
+	assert_same( 2, $GLOBALS['ui_meta_writes'], 'Removing an already empty inventory must be idempotent.' );
 
 	echo "Listing directory translation relationship tests passed.\n";
 }

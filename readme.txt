@@ -2,8 +2,8 @@
 Contributors: wpwax
 Tags: directory, directorist, multilingual, wpml
 Requires at least: 6.0
-Tested up to: 7.0
-Stable tag: 2.2.2
+Tested up to: 7.1
+Stable tag: 2.2.3
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -108,6 +108,12 @@ Use WPML Translation Dashboard and ATE for listings, directory builder packages,
 
 == Changelog ==
 
+= 2.2.3 =
+* Fixed: Completed target-language Single Listing Header action labels remain intact when Directorist reads translated directory metadata through the normal runtime filter.
+* Improved: Listing ATE jobs now include only visitor-facing header action labels and explicit frontend option values, excluding builder-only widget captions.
+* Added: Completion-to-runtime regression coverage for persisting translated directory metadata and reading it through the normal Directorist term-meta path.
+* Tested: Verified with WordPress 7.1, Directorist 8.9.3, WPML Multilingual CMS 4.9.7, and WPML String Translation 3.5.4.
+
 = 2.2.2 =
 * Breaking: Moved Directory Builder visual translation from raw translated term meta and mixed string workflows to dedicated WPML Translation Dashboard/ATE packages.
 * Added: Directory Builder labels, placeholders, sections, layouts, field options, validation messages, dialogs, and controls are exposed in their directory-specific ATE package.
@@ -142,6 +148,9 @@ Use WPML Translation Dashboard and ATE for listings, directory builder packages,
 * Added: Directorist compatibility.
 
 == Upgrade Notice ==
+
+= 2.2.3 =
+Refresh or re-send open listing translation jobs so they use the reduced header-string inventory. Completed target-language action labels are preserved at runtime.
 
 = 2.2.2 =
 Directory Builder, page UI, and Settings UI translations now use WPML Translation Dashboard and ATE jobs/packages. Back up the site before upgrading and refresh existing translation jobs so they include the new visual-string packages and admin label coverage.

@@ -2270,7 +2270,17 @@ class Directory_Builder_String_Package {
         }
 
         if ( is_array( $source_meta_value ) ) {
-            $translated_value = $this->translate_meta_value( $source_meta_value, $source_directory_id, $meta_key );
+            $target_meta_value = $object_id !== $source_directory_id
+                ? $this->get_raw_term_meta( $object_id, $meta_key, true )
+                : [];
+            $translated_value = $this->translate_meta_value(
+                $source_meta_value,
+                $source_directory_id,
+                $meta_key,
+                [],
+                is_array( $target_meta_value ) ? $target_meta_value : [],
+                (string) apply_filters( 'wpml_current_language', null )
+            );
 
             return [ $translated_value ];
         }
@@ -2324,23 +2334,39 @@ class Directory_Builder_String_Package {
      * @param int    $source_directory_id Source directory type term ID.
      * @param string $meta_key            Meta key.
      * @param array  $path                Current nested path.
+     * @param array  $existing            Existing translated builder value.
+     * @param string $language_code       Target language code.
      * @return array
      */
-    private function translate_meta_value( $data, $source_directory_id, $meta_key, $path = [] ) {
+    private function translate_meta_value( $data, $source_directory_id, $meta_key, $path = [], $existing = [], $language_code = '' ) {
         foreach ( $data as $key => $value ) {
             $current_path = array_merge( $path, [ (string) $key ] );
+            $existing_value = is_array( $existing ) && array_key_exists( $key, $existing ) ? $existing[ $key ] : null;
 
             if ( is_array( $value ) ) {
-                $data[ $key ] = $this->translate_meta_value( $value, $source_directory_id, $meta_key, $current_path );
+                $data[ $key ] = $this->translate_meta_value(
+                    $value,
+                    $source_directory_id,
+                    $meta_key,
+                    $current_path,
+                    is_array( $existing_value ) ? $existing_value : [],
+                    $language_code
+                );
                 continue;
             }
 
-            if ( ! $this->is_translatable_string( $key, $value, $current_path ) ) {
+            if ( ! $this->is_translatable_string( $key, $value, $current_path, $meta_key, $data ) ) {
                 continue;
             }
 
             $string = $this->build_string_data( $meta_key, $current_path, $value );
-            $data[ $key ] = $this->translate_package_string( $value, $string['name'], $this->get_package( $source_directory_id ) );
+            $translated_value = $this->translate_package_string( $value, $string['name'], $this->get_package( $source_directory_id ) );
+
+            if ( $translated_value !== $value ) {
+                $data[ $key ] = $translated_value;
+            } elseif ( $this->has_existing_translation_value( $existing_value, $language_code ) ) {
+                $data[ $key ] = $existing_value;
+            }
         }
 
         return $data;
@@ -2376,7 +2402,7 @@ class Directory_Builder_String_Package {
                 continue;
             }
 
-            if ( ! $this->is_translatable_string( $key, $value, $current_path ) ) {
+            if ( ! $this->is_translatable_string( $key, $value, $current_path, $meta_key, $data ) ) {
                 continue;
             }
 
@@ -2976,7 +3002,7 @@ class Directory_Builder_String_Package {
                 continue;
             }
 
-            if ( ! $this->is_translatable_string( $key, $value, $current_path ) ) {
+            if ( ! $this->is_translatable_string( $key, $value, $current_path, $meta_key, $data ) ) {
                 continue;
             }
 
@@ -3016,11 +3042,14 @@ class Directory_Builder_String_Package {
     /**
      * Check whether a scalar value should be exposed for translation.
      *
-     * @param string|int $key   Array key.
-     * @param mixed      $value Value.
+     * @param string|int $key      Array key.
+     * @param mixed      $value    Value.
+     * @param array      $path     Nested array path.
+     * @param string     $meta_key Builder meta key.
+     * @param array      $parent   Parent builder item for structural classification.
      * @return bool
      */
-    private function is_translatable_string( $key, $value, $path = [] ) {
+    private function is_translatable_string( $key, $value, $path = [], $meta_key = '', $parent = [] ) {
         if ( ! is_string( $value ) || '' === trim( $value ) ) {
             return false;
         }
@@ -3043,6 +3072,31 @@ class Directory_Builder_String_Package {
 
         if ( array_intersect( [ 'conditional_logic', 'conditions', 'show_if' ], $path ) ) {
             return false;
+        }
+
+        if ( 'single_listing_header' === $meta_key ) {
+            $widget_index = array_search( 'selectedwidgets', $path, true );
+
+            // Placeholder labels describe builder positions, not listing content.
+            if ( 'label' === $key && false === $widget_index ) {
+                return false;
+            }
+
+            // A selected widget's root label is frontend text only for the
+            // action widgets whose templates actually render that property.
+            // Other labels identify builder controls such as Listing Title,
+            // Badges, Pricing, Rating, Category and Image/Slider.
+            if ( 'label' === $key && false !== $widget_index && count( $path ) === $widget_index + 3 ) {
+                $widget_name = ! empty( $parent['widget_name'] ) ? $parent['widget_name'] : ( $parent['widget_key'] ?? '' );
+
+                return in_array( sanitize_key( $widget_name ), [ 'back', 'bookmark', 'share', 'report' ], true );
+            }
+
+            // Widget options contain control captions and settings, except for
+            // the editable values used by frontend labels.
+            if ( false !== $widget_index && isset( $path[ $widget_index + 2 ] ) && 'options' === $path[ $widget_index + 2 ] ) {
+                return count( $path ) === $widget_index + 6 && 'value' === $key && $this->is_visual_builder_option_value_path( $path );
+            }
         }
 
         if ( 'value' === $key && $this->is_visual_builder_option_value_path( $path ) ) {
@@ -3157,16 +3211,12 @@ class Directory_Builder_String_Package {
      * @return bool
      */
     private function is_visual_builder_option_value_path( array $path ) {
-        if ( ! in_array( 'options', $path, true ) ) {
+        $option_path = array_slice( $path, -4 );
+        if ( count( $option_path ) !== 4 || 'options' !== $option_path[0] || 'fields' !== $option_path[1] || 'value' !== $option_path[3] ) {
             return false;
         }
 
-        $fields_index = array_search( 'fields', $path, true );
-        if ( false === $fields_index ) {
-            return false;
-        }
-
-        $field_name = isset( $path[ $fields_index + 1 ] ) ? $path[ $fields_index + 1 ] : '';
+        $field_name = $option_path[2];
 
         return in_array(
             $field_name,
