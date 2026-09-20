@@ -16,27 +16,53 @@ function is_admin() {
 }
 
 function get_directorist_option( $name ) {
-	return 'add_listing_page' === $name ? 1225 : 0;
+	if ( 'add_listing_page' === $name ) {
+		return 1225;
+	}
+
+	if ( 'search_result_page' === $name ) {
+		return 1241;
+	}
+
+	return 0;
 }
 
 function apply_filters( $hook, $value, ...$args ) {
 	if ( 'wpml_current_language' === $hook ) {
-		return 'en';
+		global $test_current_language;
+
+		return $test_current_language;
+	}
+
+	if ( 'wpml_default_language' === $hook ) {
+		return 'es';
 	}
 
 	if ( 'wpml_object_id' === $hook && 1225 === (int) $value ) {
 		return 1291;
 	}
 
+	if ( 'wpml_object_id' === $hook && 1241 === (int) $value ) {
+		return 1282;
+	}
+
 	return $value;
 }
 
 function get_post_status( $post_id ) {
-	return 1291 === (int) $post_id ? 'publish' : false;
+	return in_array( (int) $post_id, [ 1282, 1291 ], true ) ? 'publish' : false;
 }
 
 function get_permalink( $post_id ) {
-	return 1291 === (int) $post_id ? 'https://example.com/en/add-a-listing/' : false;
+	if ( 1291 === (int) $post_id ) {
+		return 'https://example.com/en/add-a-listing/';
+	}
+
+	if ( 1282 === (int) $post_id ) {
+		return 'https://example.com/en/directory-results/';
+	}
+
+	return false;
 }
 
 function wp_parse_url( $url, $component = -1 ) {
@@ -67,8 +93,9 @@ function assert_same( $expected, $actual, $message ) {
 	exit( 1 );
 }
 
-$test_has_wpml_filter = true;
-$test_is_admin        = false;
+$test_has_wpml_filter  = true;
+$test_is_admin         = false;
+$test_current_language = 'en';
 $permalinks           = new Filter_Permalinks();
 
 assert_same(
@@ -82,6 +109,22 @@ assert_same(
 	$permalinks->filter_add_listing_page_url( 'https://example.com/en/?plan=3&listing_type=general-directory-en' ),
 	'Pricing plan and directory query arguments must survive translated Add Listing URL resolution.'
 );
+
+assert_same(
+	'https://example.com/en/directory-results/',
+	$permalinks->filter_divi_home_search_result_base_url( 'https://example.com/en/' ),
+	'The translated Divi Homepage Search route must use the translated Directorist Search Result page.'
+);
+
+$test_current_language = 'es';
+
+assert_same(
+	'https://example.com/',
+	$permalinks->filter_divi_home_search_result_base_url( 'https://example.com/' ),
+	'The default-language Divi Homepage Search route must remain unchanged.'
+);
+
+$test_current_language = 'en';
 
 $test_is_admin = true;
 

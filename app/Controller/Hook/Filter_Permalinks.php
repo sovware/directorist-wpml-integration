@@ -22,6 +22,7 @@ class Filter_Permalinks {
         add_filter( 'atbdp_payment_receipt_page_url', [ $this, 'filter_payment_receipt_page_url' ], 20, 3 );
         add_filter( 'atbdp_add_listing_page_url', [ $this, 'filter_add_listing_page_url' ], 20, 3 );
         add_filter( 'atbdp_search_result_page_url', [ $this, 'filter_search_result_page_url' ], 20, 1 );
+        add_filter( 'directorist_divi_home_search_result_base_url', [ $this, 'filter_divi_home_search_result_base_url' ], 20, 1 );
         add_filter( 'atbdp_edit_listing_page_url', [ $this, 'filter_edit_listing_page_url' ], 20, 3 );
         add_filter( 'atbdp_author_profile_page_url', [ $this, 'filter_author_profile_page_url' ], 20, 4 );
         
@@ -651,6 +652,32 @@ class Filter_Permalinks {
         $translated_url = get_permalink( (int) $translated_page_id );
 
         return $translated_url ? $translated_url : $url;
+    }
+
+    /**
+     * Filter the Divi Homepage Search result base URL on translated frontends.
+     *
+     * Divi's Homepage Search result template normally uses the site homepage.
+     * When the translated homepage is unavailable or intentionally redirected,
+     * use Directorist's translated Search Result page instead. The default
+     * language keeps the original Homepage Search route unchanged.
+     *
+     * @param string $url Homepage Search result base URL.
+     * @return string
+     */
+    public function filter_divi_home_search_result_base_url( $url = '' ) {
+        if ( ! has_filter( 'wpml_object_id' ) || is_admin() ) {
+            return $url;
+        }
+
+        $current_language = apply_filters( 'wpml_current_language', null );
+        $default_language = apply_filters( 'wpml_default_language', null );
+
+        if ( empty( $current_language ) || empty( $default_language ) || $current_language === $default_language ) {
+            return $url;
+        }
+
+        return $this->filter_search_result_page_url( $url );
     }
 
     /**

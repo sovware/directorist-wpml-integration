@@ -111,6 +111,7 @@ Use WPML Translation Dashboard and ATE for listings, directory builder packages,
 = 2.2.4 =
 * Fixed: Pricing-plan actions on translated Add Listing pages now keep visitors on the matching WPML page instead of falling back to the language home URL.
 * Fixed: Nested directory attributes no longer trigger array-to-string PHP warnings while Directorist page UI strings are collected.
+* Fixed: Divi Homepage Search submissions on translated pages now use the translated Directorist Search Result page when the translated homepage is unavailable or redirected.
 
 = 2.2.3 =
 * Fixed: Completed target-language Single Listing Header action labels remain intact when Directorist reads translated directory metadata through the normal runtime filter.
