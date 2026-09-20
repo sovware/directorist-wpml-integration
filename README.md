@@ -12,7 +12,7 @@ Official WPML integration extension for [Directorist](https://directorist.com) t
 - Makes Directorist settings, widgets/blocks and email templates available through the appropriate WPML translation workflow.
 - Applies translated Directorist admin submenu labels through a lightweight admin-only runtime bridge that uses the same WPML package translations and never loads on the frontend.
 - Automatically syncs category and listing `_directory_type` meta plus directory `_default` flags across translations.
-- Tested with WordPress 7.0.2, PHP 8.2.29, Directorist 8.9.2, WPML 4.9.5, and WPML String Translation 3.5.3.
+- Tested with WordPress 7.1, PHP 8.5.7, Directorist 8.9.3, WPML 4.9.7, and WPML String Translation 3.5.4.
 
 ## Release coverage snapshot
 
@@ -28,6 +28,11 @@ LocalWP release verification on 2026-07-30 covered the English-to-Dutch WPML/ATE
 The current repair pass manually translated 26 ATE-visible Builder segments and synchronized 64 exact WPML string rows through WPML APIs after database backups. The active Builder ATE job still has untranslated segments, so it was deliberately not falsely marked complete. The Settings UI job is complete for its current 950 strings, but 14 newly registered strings require a Translation Dashboard refresh/re-send before they can be completed in ATE.
 
 ## Changelog (short)
+
+- **2.2.3 (2026-09-20)**
+  - Preserved completed target-language Single Listing Header action labels through Directorist's normal runtime metadata filter.
+  - Limited listing ATE header fields to visitor-facing action labels and explicit frontend option values.
+  - Added regression coverage from listing translation completion through persisted directory metadata to runtime output.
 
 - **2.2.2 (2026-07-20)**
   - Moved Directory Builder visual translation to dedicated WPML Translation Dashboard/ATE packages.
