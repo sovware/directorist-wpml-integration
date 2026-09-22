@@ -3099,10 +3099,27 @@ class Directory_Builder_String_Package {
             }
         }
 
-        if ( 'submission_form_fields' === $meta_key && in_array( 'groups', $path, true ) && in_array( $key, [ 'default_group_label', 'defaultgrouplabel' ], true ) ) {
-            // Directorist copies this builder fallback caption into every saved
-            // group. The group's label is the visitor-facing section heading.
-            return false;
+        if ( 'submission_form_fields' === $meta_key && in_array( 'groups', $path, true ) ) {
+            if ( in_array( $key, [ 'default_group_label', 'defaultgrouplabel' ], true ) ) {
+                // Directorist copies this builder fallback caption into every
+                // saved group. The group's custom label is the visitor-facing
+                // section heading.
+                return false;
+            }
+
+            if ( 'label' === $key ) {
+                $default_group_label = $parent['defaultGroupLabel'] ?? ( $parent['default_group_label'] ?? '' );
+                $default_group_label = is_string( $default_group_label )
+                    ? trim( wp_strip_all_tags( html_entity_decode( $default_group_label, ENT_QUOTES, get_bloginfo( 'charset' ) ) ) )
+                    : '';
+
+                // An untouched group stores the builder fallback in both
+                // `label` and `defaultGroupLabel`. Only a customized label is
+                // visitor-facing and should enter the listing ATE package.
+                if ( '' !== $default_group_label && $trimmed_value === $default_group_label ) {
+                    return false;
+                }
+            }
         }
 
         if ( 'value' === $key && $this->is_visual_builder_option_value_path( $path ) ) {

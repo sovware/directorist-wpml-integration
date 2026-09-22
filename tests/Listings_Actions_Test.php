@@ -273,6 +273,7 @@ namespace {
 		],
 		'groups' => [
 			[ 'id' => 'main', 'label' => 'Main Section', 'defaultGroupLabel' => 'Section' ],
+			[ 'id' => 'section', 'label' => 'Section', 'defaultGroupLabel' => 'Section' ],
 		],
 	];
 
