@@ -274,6 +274,51 @@ $custom_form = array(
 	),
 );
 assert_same( array( 'Icon', 'Top Left', 'Bookmark Settings' ), array_values( $package->get_translatable_meta_string_map( 'submission_form_fields', $custom_form ) ), 'Real form labels, placeholders and choices must remain translatable even when they match control captions.' );
+
+// Saved form groups repeat the builder-only default caption beside the real
+// visitor-facing section heading.
+$sectioned_form = array(
+	'fields' => array(
+		'custom' => array(
+			'label' => 'Section',
+		),
+	),
+	'groups' => array(
+		array(
+			'id'                => 'general-section',
+			'label'             => 'General Section',
+			'defaultGroupLabel' => 'Section',
+		),
+		array(
+			'id'                => 'opening-hours',
+			'label'             => 'Opening hours',
+			'defaultGroupLabel' => 'Section',
+		),
+		array(
+			'id'                => 'food-facilities',
+			'label'             => 'Food &amp; Facilities',
+			'defaultGroupLabel' => 'Section',
+		),
+	),
+);
+$sectioned_form_strings = $package->get_translatable_meta_string_map( 'submission_form_fields', $sectioned_form );
+assert_same(
+	array( 'Section', 'General Section', 'Opening hours', 'Food &amp; Facilities' ),
+	array_values( $sectioned_form_strings ),
+	'Listing ATE packages must keep real field and section labels without repeated builder fallback captions.'
+);
+
+$legacy_section_translation = $package->apply_translatable_meta_string_map(
+	'submission_form_fields',
+	$sectioned_form,
+	array(
+		'builder_submission_form_fields__groups__0__label'             => 'Allmänt avsnitt',
+		'builder_submission_form_fields__groups__0__defaultgrouplabel' => 'Wrong translated control caption',
+	)
+);
+assert_same( 'Allmänt avsnitt', $legacy_section_translation['groups'][0]['label'], 'A real section heading must accept its ATE translation.' );
+assert_same( 'Section', $legacy_section_translation['groups'][0]['defaultGroupLabel'], 'Legacy jobs must not apply translations to the builder fallback caption.' );
+
 $direct_header = array(
 	array(
 		'label'           => 'Top Left',

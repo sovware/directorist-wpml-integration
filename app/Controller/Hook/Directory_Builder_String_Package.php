@@ -3099,6 +3099,12 @@ class Directory_Builder_String_Package {
             }
         }
 
+        if ( 'submission_form_fields' === $meta_key && in_array( 'groups', $path, true ) && in_array( $key, [ 'default_group_label', 'defaultgrouplabel' ], true ) ) {
+            // Directorist copies this builder fallback caption into every saved
+            // group. The group's label is the visitor-facing section heading.
+            return false;
+        }
+
         if ( 'value' === $key && $this->is_visual_builder_option_value_path( $path ) ) {
             return true;
         }

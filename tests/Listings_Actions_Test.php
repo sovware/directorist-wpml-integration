@@ -272,7 +272,7 @@ namespace {
 			],
 		],
 		'groups' => [
-			[ 'id' => 'main', 'label' => 'Main Section' ],
+			[ 'id' => 'main', 'label' => 'Main Section', 'defaultGroupLabel' => 'Section' ],
 		],
 	];
 
@@ -296,6 +296,7 @@ namespace {
 		assert_same( true, in_array( $expected_value, $source_ui_strings, true ), 'Every active or future layout string must enter the listing ATE inventory dynamically.' );
 	}
 	assert_same( false, in_array( 'Badges', $source_ui_strings, true ), 'Internal header widget captions must stay out of the listing ATE inventory.' );
+	assert_same( false, in_array( 'Section', $source_ui_strings, true ), 'Repeated submission-form builder captions must stay out of the listing ATE inventory.' );
 
 	$translated_ui_strings = [];
 	foreach ( $source_ui_strings as $key => $value ) {
@@ -317,6 +318,7 @@ namespace {
 	assert_same( 'share', $translated_layouts['header'][0]['placeholders'][0]['selectedWidgets'][1]['widget_name'], 'Widget identities must never be translated.' );
 	assert_same( 'custom-choice', $translated_layouts['form']['fields']['choice']['field_key'], 'Field keys must never be translated.' );
 	assert_same( 'first', $translated_layouts['form']['fields']['choice']['options'][0]['option_value'], 'Option values must never be translated.' );
+	assert_same( 'Section', $translated_layouts['form']['groups'][0]['defaultGroupLabel'], 'Builder fallback captions must remain structural source data.' );
 
 	// Existing listings must be refreshed before WPML reads their custom fields.
 	$GLOBALS['wpdb']            = new Listing_UI_Test_Database();
