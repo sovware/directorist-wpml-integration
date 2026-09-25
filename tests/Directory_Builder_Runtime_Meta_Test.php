@@ -34,8 +34,8 @@ namespace {
 			return 'nl';
 		}
 
-		// Simulate the runtime package reader returning no separate package
-		// translation. Completed target metadata must remain authoritative.
+	// Simulate the runtime package reader returning no separate package
+	// translation. Completed target metadata must remain authoritative.
 		return $value;
 	}
 
@@ -245,7 +245,7 @@ namespace {
 
 	$package = new Directory_Builder_String_Package();
 	$source_strings = $package->get_translatable_meta_string_map( 'single_listing_header', $source_header );
-	assert_runtime_same( array( 'Bookmark', 'Bookmark' ), array_values( $source_strings ), 'Only the visitor-facing bookmark strings should enter the listing ATE payload.' );
+	assert_runtime_same( array( 'Bookmark', 'Bookmark' ), array_values( $source_strings ), 'Only visitor-facing bookmark strings should enter the Directory Builder package.' );
 	$GLOBALS['listing_ui_meta'][127] = $source_strings;
 
 	$fields = array();
@@ -260,10 +260,15 @@ namespace {
 	$listings = new Listings_Actions();
 	$job      = (object) array( 'original_doc_id' => 127, 'language_code' => 'nl' );
 	$listings->update_directory_type_after_listing_translation( 184, $fields, $job );
+	assert_runtime_same( 'Old target label', $GLOBALS['wpdb']->meta[144]['single_listing_header'][0]['selectedWidgets'][0]['label'], 'Completing a listing job must not overwrite directory-level UI translations.' );
+
+	$translations = array_fill_keys( array_keys( $source_strings ), 'Bladwijzer' );
+	$translated_header = $package->apply_translatable_meta_string_map( 'single_listing_header', $source_header, $translations, $target_header, 'nl' );
+	update_term_meta( 144, 'single_listing_header', $translated_header );
 
 	$persisted = $GLOBALS['wpdb']->meta[144]['single_listing_header'];
-	assert_runtime_same( 'Bladwijzer', $persisted[0]['selectedWidgets'][0]['label'], 'The completion handler must persist the target bookmark label.' );
-	assert_runtime_same( 'Listing Title', $persisted[0]['selectedWidgets'][1]['label'], 'The completion handler must discard translated internal widget captions.' );
+	assert_runtime_same( 'Bladwijzer', $persisted[0]['selectedWidgets'][0]['label'], 'The Directory Builder package must persist the target bookmark label.' );
+	assert_runtime_same( 'Listing Title', $persisted[0]['selectedWidgets'][1]['label'], 'The Directory Builder package must discard translated internal widget captions.' );
 
 	$filtered = $package->translate_builder_term_meta( null, 144, 'single_listing_header', true );
 	assert_runtime_same( 'Bladwijzer', $filtered[0][0]['selectedWidgets'][0]['label'], 'The normal runtime filter must preserve the completed target widget label.' );
@@ -271,5 +276,5 @@ namespace {
 	assert_runtime_same( 'la la-heart-o', $filtered[0][0]['selectedWidgets'][0]['icon'], 'The normal runtime filter must keep non-translatable configuration aligned with the source layout.' );
 	assert_runtime_same( 'Listing Title', $filtered[0][0]['selectedWidgets'][1]['label'], 'The normal runtime filter must not preserve translated internal widget captions.' );
 
-	echo "Directory Builder completion-to-runtime metadata test passed.\n";
+	echo "Directory Builder package-to-runtime metadata test passed.\n";
 }

@@ -25,6 +25,14 @@ namespace {
 		return isset( $GLOBALS['listing_meta'][ $post_id ] ) ? ATBDP_POST_TYPE : '';
 	}
 
+	function wp_is_post_autosave( $post_id ) {
+		return false;
+	}
+
+	function wp_is_post_revision( $post_id ) {
+		return false;
+	}
+
 	function get_post_meta( $post_id, $key, $single = false ) {
 		if ( '_directorist_wpml_page_ui_strings' === $key ) {
 			return isset( $GLOBALS['listing_ui_meta'][ $post_id ] ) ? $GLOBALS['listing_ui_meta'][ $post_id ] : '';
@@ -168,10 +176,8 @@ namespace Directorist_WPML_Integration\Helper {
 }
 
 namespace {
-	require_once dirname( __DIR__ ) . '/app/Controller/Hook/Directory_Builder_String_Package.php';
 	require_once dirname( __DIR__ ) . '/app/Controller/Hook/Listings_Actions.php';
 
-	use Directorist_WPML_Integration\Controller\Hook\Directory_Builder_String_Package;
 	use Directorist_WPML_Integration\Controller\Hook\Listings_Actions;
 
 	function assert_listing_directory( $listing_id, $directory_id, $message ) {
@@ -197,9 +203,7 @@ namespace {
 		exit( 1 );
 	}
 
-	$reflection = new ReflectionClass( Listings_Actions::class );
-	$listings   = $reflection->newInstanceWithoutConstructor();
-	new Directory_Builder_String_Package();
+	$listings = new Listings_Actions();
 
 	foreach ( [ [ 198, 154 ], [ 200, 127 ] ] as $fixture ) {
 		$job = (object) [
@@ -218,141 +222,34 @@ namespace {
 	assert_listing_directory( 198, 135, 'German listing 198 must map both meta and taxonomy relationship to directory 135.' );
 	assert_listing_directory( 200, 135, 'German listing 200 must map both meta and taxonomy relationship to directory 135.' );
 
-	$collect_listing_ui_strings = $reflection->getMethod( 'collect_single_listing_ui_strings' );
-	$collect_listing_ui_strings->setAccessible( true );
-	$apply_listing_ui_strings = $reflection->getMethod( 'apply_single_listing_ui_strings' );
-	$apply_listing_ui_strings->setAccessible( true );
-
-	$header = [
-		[
-			'placeholderKey' => 'header-group',
-			'placeholders' => [
-				[
-					'placeholderKey' => 'actions',
-					'selectedWidgets' => [
-						[ 'widget_name' => 'bookmark', 'widget_key' => 'bookmark', 'label' => 'Bookmark' ],
-						[ 'widget_name' => 'share', 'widget_key' => 'share', 'label' => 'Share' ],
-						[ 'widget_name' => 'title', 'widget_key' => 'title', 'label' => 'Listing Title' ],
-						[ 'widget_name' => 'badges', 'widget_key' => 'badges', 'label' => 'Badges' ],
-					],
-				],
-			],
-		],
-	];
-	$contents = [
-		'fields' => [
-			'custom-content' => [
-				'widget_name' => 'custom_content',
-				'widget_key'  => 'custom-content',
-				'label'       => 'Custom Content Label',
-				'content'     => 'Custom content body',
-			],
-		],
-		'groups' => [
-			[ 'id' => 'existing-section', 'label' => 'Existing Section' ],
-			[ 'id' => 'future-section', 'label' => 'Future Section' ],
-		],
-	];
-	$form = [
-		'fields' => [
-			'title' => [
-				'field_key'   => 'listing_title',
-				'label'       => 'Listing Title',
-				'placeholder' => 'Enter a title',
-				'widget_name' => 'title',
-			],
-			'choice' => [
-				'field_key'   => 'custom-choice',
-				'label'       => 'Dynamic Choice',
-				'field_key_2' => 'technical-key',
-				'options'     => [
-					[ 'option_value' => 'first', 'option_label' => 'First Option' ],
-					[ 'option_value' => 'second', 'option_label' => 'Second Option' ],
-				],
-			],
-		],
-		'groups' => [
-			[ 'id' => 'main', 'label' => 'Main Section' ],
-		],
-	];
-
-	$source_ui_strings = $collect_listing_ui_strings->invoke( $listings, $header, $contents, $form );
-	$expected_values   = [
-		'Bookmark',
-		'Share',
-		'Custom Content Label',
-		'Custom content body',
-		'Existing Section',
-		'Future Section',
-		'Listing Title',
-		'Enter a title',
-		'Dynamic Choice',
-		'First Option',
-		'Second Option',
-		'Main Section',
-	];
-
-	foreach ( $expected_values as $expected_value ) {
-		assert_same( true, in_array( $expected_value, $source_ui_strings, true ), 'Every active or future layout string must enter the listing ATE inventory dynamically.' );
-	}
-	assert_same( false, in_array( 'Badges', $source_ui_strings, true ), 'Internal header widget captions must stay out of the listing ATE inventory.' );
-
-	$translated_ui_strings = [];
-	foreach ( $source_ui_strings as $key => $value ) {
-		$translated_ui_strings[ $key ] = 'Translated: ' . $value;
-	}
-
-	$translated_layouts = $apply_listing_ui_strings->invoke( $listings, $header, $contents, $form, $translated_ui_strings, 'xx' );
-	$translated_strings = $collect_listing_ui_strings->invoke(
-		$listings,
-		$translated_layouts['header'],
-		$translated_layouts['contents'],
-		$translated_layouts['form']
-	);
-
-	foreach ( $translated_ui_strings as $key => $value ) {
-		assert_same( $value, $translated_strings[ $key ], 'Every collected listing UI string must accept any target-language ATE value.' );
-	}
-
-	assert_same( 'share', $translated_layouts['header'][0]['placeholders'][0]['selectedWidgets'][1]['widget_name'], 'Widget identities must never be translated.' );
-	assert_same( 'custom-choice', $translated_layouts['form']['fields']['choice']['field_key'], 'Field keys must never be translated.' );
-	assert_same( 'first', $translated_layouts['form']['fields']['choice']['options'][0]['option_value'], 'Option values must never be translated.' );
-
-	// Existing listings must be refreshed before WPML reads their custom fields.
-	$GLOBALS['wpdb']            = new Listing_UI_Test_Database();
-	$GLOBALS['wpdb']->layouts   = array(
-		'single_listing_header'    => $header,
-		'single_listings_contents' => $contents,
-		'submission_form_fields'   => $form,
-	);
+	// Existing listing jobs must discard builder strings before WPML reads post meta.
 	$GLOBALS['listing_ui_meta'] = array(
-		127 => array( 'stale_control' => 'Bookmark Settings' ),
-		184 => array( 'translated_label' => 'Favori' ),
+		127 => array( 'builder_submission_form_fields__fields__textarea__placeholder' => 'Opening hours' ),
+		184 => array( 'builder_submission_form_fields__fields__textarea__placeholder' => 'Öffnungszeiten' ),
 	);
-	$GLOBALS['ui_meta_writes']  = 0;
-	$hook_listings              = new Listings_Actions();
-	$callback                   = $GLOBALS['registered_actions']['wpml_pb_register_all_strings_for_translation'];
+	$GLOBALS['ui_meta_writes'] = 0;
+	$hook_listings             = new Listings_Actions();
+	$callback                  = $GLOBALS['registered_actions']['wpml_pb_register_all_strings_for_translation'];
+
 	$callback( new WP_Post( 127 ) );
-	$expected_inventory = $source_ui_strings;
-	ksort( $expected_inventory );
-	assert_same( $expected_inventory, $GLOBALS['listing_ui_meta'][127], 'Sending an existing listing must replace stale UI metadata with the current inventory.' );
+	assert_same( false, isset( $GLOBALS['listing_ui_meta'][127] ), 'A new listing job must not include legacy Directory Builder placeholders.' );
+	assert_same( 1, $GLOBALS['ui_meta_writes'], 'Legacy listing UI meta must be removed once.' );
+
 	$callback( new WP_Post( 127 ) );
-	assert_same( 1, $GLOBALS['ui_meta_writes'], 'Preparing an unchanged listing again must not rewrite its metadata.' );
-	$callback( new WP_Post( 184 ) );
 	$callback( new WP_Post( 127, 'page' ) );
-	$callback(
-		(object) array(
-			'ID'        => 127,
-			'post_type' => ATBDP_POST_TYPE,
-		)
-	);
-	assert_same( 1, $GLOBALS['ui_meta_writes'], 'Translated listings, pages and non-post packages must be left untouched.' );
-	assert_same( array( 'translated_label' => 'Favori' ), $GLOBALS['listing_ui_meta'][184], 'Existing translated listing text must be preserved.' );
-	$GLOBALS['wpdb']->layouts = array( 'single_listing_header' => array( array( 'label' => 'Top Left' ) ) );
-	$callback( new WP_Post( 127 ) );
-	assert_same( false, isset( $GLOBALS['listing_ui_meta'][127] ), 'An empty frontend inventory must remove old control-only metadata.' );
-	$callback( new WP_Post( 127 ) );
-	assert_same( 2, $GLOBALS['ui_meta_writes'], 'Removing an already empty inventory must be idempotent.' );
+	$callback( (object) array( 'ID' => 127, 'post_type' => ATBDP_POST_TYPE ) );
+	assert_same( 1, $GLOBALS['ui_meta_writes'], 'Repeated jobs, pages and non-post packages must not rewrite listing meta.' );
+
+	$callback( new WP_Post( 184 ) );
+	assert_same( false, isset( $GLOBALS['listing_ui_meta'][184] ), 'Translated listings must also discard copied builder strings.' );
+	assert_same( 2, $GLOBALS['ui_meta_writes'], 'Removing the translated listing payload must happen once.' );
+
+	$GLOBALS['listing_ui_meta'][154] = array( 'builder_submission_form_fields__fields__textarea__placeholder' => 'Opening hours' );
+	$hook_listings->clear_listing_ui_strings_on_save( 154, new WP_Post( 154 ), true );
+	assert_same( false, isset( $GLOBALS['listing_ui_meta'][154] ), 'Saving a listing must clear its legacy builder payload.' );
+
+	$hook_listings->clear_listing_ui_strings_on_save( 127, new WP_Post( 127, 'page' ), true );
+	assert_same( 3, $GLOBALS['ui_meta_writes'], 'Saving other post types must not affect listing meta.' );
 
 	echo "Listing directory translation relationship tests passed.\n";
 }
