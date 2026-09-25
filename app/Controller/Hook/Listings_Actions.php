@@ -21,9 +21,9 @@ class Listings_Actions {
         add_action( 'icl_make_duplicate', [ $this, 'update_directory_type_after_listing_duplicate' ], 20, 4 );
         add_action( 'post_updated', [ $this, 'update_directory_type_after_listing_update' ], 20, 1 );
         add_filter( 'wpml_pro_translation_completed', [ $this, 'update_directory_type_after_listing_translation' ], 20, 3 );
-        add_action( 'save_post_at_biz_dir', [ $this, 'sync_listing_ui_strings_on_save' ], 40, 3 );
-        add_action( 'wpml_pb_register_all_strings_for_translation', [ $this, 'sync_listing_ui_strings_before_translation' ], 40 );
-        add_action( 'directorist_after_update_directory_type', [ $this, 'sync_directory_listing_ui_strings' ], 40, 1 );
+        add_action( 'save_post_at_biz_dir', [ $this, 'clear_listing_ui_strings_on_save' ], 40, 3 );
+        add_action( 'wpml_pb_register_all_strings_for_translation', [ $this, 'clear_listing_ui_strings_before_translation' ], 40 );
+        add_action( 'directorist_after_update_directory_type', [ $this, 'clear_directory_listing_ui_strings' ], 40, 1 );
     }
 
     /**
@@ -53,52 +53,48 @@ class Listings_Actions {
             $this->set_listing_directory_type( $new_post_id, $target_directory_id );
         }
 
-        if ( is_array( $fields ) && ! empty( $fields ) ) {
-            $this->sync_translated_listing_ui_strings( $source_post_id, $fields, $target_language );
-        }
-
         return $new_post_id;
     }
 
     /**
-     * Sync hidden UI strings when a listing is saved.
+     * Remove legacy Directory Builder strings when a listing is saved.
      *
      * @param int      $post_id Listing ID.
      * @param \WP_Post $post    Listing post.
      * @param bool     $update  Whether this is an update.
      * @return void
      */
-    public function sync_listing_ui_strings_on_save( $post_id, $post, $update ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
+    public function clear_listing_ui_strings_on_save( $post_id, $post, $update ) { // phpcs:ignore Generic.CodeAnalysis.UnusedFunctionParameter
         if ( wp_is_post_autosave( $post_id ) || wp_is_post_revision( $post_id ) || ATBDP_POST_TYPE !== $post->post_type ) {
             return;
         }
 
-        $this->sync_listing_ui_strings( (int) $post_id );
+        $this->clear_listing_ui_strings( (int) $post_id );
     }
 
     /**
-     * Refresh stored listing UI text before WPML builds a new translation package.
+     * Remove stored Directory Builder text before WPML builds a listing job.
      *
-     * Existing listings may still contain captions collected by an older version.
+     * Existing listings may still contain directory-level text collected by an older version.
      *
      * @param \WP_Post $post Source post being sent for translation.
      * @return void
      */
-    public function sync_listing_ui_strings_before_translation( $post ) {
+    public function clear_listing_ui_strings_before_translation( $post ) {
         if ( ! $post instanceof \WP_Post || ATBDP_POST_TYPE !== $post->post_type ) {
             return;
         }
 
-        $this->sync_listing_ui_strings( $post->ID );
+        $this->clear_listing_ui_strings( $post->ID );
     }
 
     /**
-     * Refresh only the listings that use a Directory Builder layout after it changes.
+     * Remove legacy UI payloads from listings when their directory layout changes.
      *
      * @param int $directory_id Directory type term ID.
      * @return void
      */
-    public function sync_directory_listing_ui_strings( $directory_id ) {
+    public function clear_directory_listing_ui_strings( $directory_id ) {
         $directory_id = absint( $directory_id );
         if ( ! $this->is_valid_directory_type( $directory_id ) || ! $this->is_source_directory_type( $directory_id ) ) {
             return;
@@ -123,7 +119,7 @@ class Listings_Actions {
         );
 
         foreach ( array_map( 'absint', $listing_ids ) as $listing_id ) {
-            $this->sync_listing_ui_strings( $listing_id );
+            $this->clear_listing_ui_strings( $listing_id );
         }
     }
 
@@ -347,216 +343,23 @@ class Listings_Actions {
     }
 
     /**
-     * Persist the current Directory Builder text inventory in a source listing's ATE payload.
+     * Remove the legacy directory-level payload from a listing translation job.
      *
-     * No widget, section, language, or translated value is hard-coded. The
-     * inventory follows the active saved layout and form schema.
+     * Directory Builder strings are translated once through their own WPML
+     * package, not repeatedly with every listing.
      *
-     * @param int $listing_id Source listing ID.
+     * @param int $listing_id Listing ID.
      * @return void
      */
-    private function sync_listing_ui_strings( $listing_id ) {
+    private function clear_listing_ui_strings( $listing_id ) {
         $listing_id = absint( $listing_id );
-        if ( $listing_id <= 0 || ATBDP_POST_TYPE !== get_post_type( $listing_id ) || ! $this->is_source_listing( $listing_id ) ) {
+        if ( $listing_id <= 0 || ATBDP_POST_TYPE !== get_post_type( $listing_id ) ) {
             return;
         }
 
-        $directory_id = $this->get_valid_directory_type_id( $listing_id );
-        if ( $directory_id <= 0 ) {
-            return;
+        if ( delete_post_meta( $listing_id, self::UI_META_KEY ) && $this->is_source_listing( $listing_id ) ) {
+            $this->mark_listing_translations_need_update( $listing_id );
         }
-
-        $layouts = $this->get_directory_listing_layouts( $directory_id );
-        $strings = $this->collect_single_listing_ui_strings( $layouts['header'], $layouts['contents'], $layouts['form'] );
-
-        if ( empty( $strings ) ) {
-            if ( delete_post_meta( $listing_id, self::UI_META_KEY ) ) {
-                $this->mark_listing_translations_need_update( $listing_id );
-            }
-            return;
-        }
-
-        ksort( $strings );
-
-        if ( $strings === get_post_meta( $listing_id, self::UI_META_KEY, true ) ) {
-            return;
-        }
-
-        update_post_meta( $listing_id, self::UI_META_KEY, $strings );
-        $this->mark_listing_translations_need_update( $listing_id );
-    }
-
-    /**
-     * Collect all active listing UI text by stable layout identity.
-     *
-     * @param mixed $header   Header layout.
-     * @param mixed $contents Content layout.
-     * @param mixed $form     Submission form layout.
-     * @return array
-     */
-    private function collect_single_listing_ui_strings( $header, $contents, $form = [] ) {
-        $package = Directory_Builder_String_Package::instance();
-        if ( ! $package ) {
-            return [];
-        }
-
-        return array_merge(
-            $package->get_translatable_meta_string_map( 'single_listing_header', $header ),
-            $package->get_translatable_meta_string_map( 'single_listings_contents', $contents ),
-            $package->get_translatable_meta_string_map( 'submission_form_fields', $form )
-        );
-    }
-
-    /**
-     * Apply a language-neutral translation map to all active listing layouts.
-     *
-     * @param mixed  $header        Header layout.
-     * @param mixed  $contents      Content layout.
-     * @param mixed  $form          Submission form layout.
-     * @param array  $translations  String map keyed by stable layout identity.
-     * @param string $language_code Target language.
-     * @return array
-     */
-    private function apply_single_listing_ui_strings( $header, $contents, $form, array $translations, $language_code = '' ) {
-        $package = Directory_Builder_String_Package::instance();
-        if ( ! $package ) {
-            return compact( 'header', 'contents', 'form' );
-        }
-
-        return [
-            'header' => $package->apply_translatable_meta_string_map(
-                'single_listing_header',
-                is_array( $header ) ? $header : [],
-                $translations,
-                [],
-                $language_code
-            ),
-            'contents' => $package->apply_translatable_meta_string_map(
-                'single_listings_contents',
-                is_array( $contents ) ? $contents : [],
-                $translations,
-                [],
-                $language_code
-            ),
-            'form' => $package->apply_translatable_meta_string_map(
-                'submission_form_fields',
-                is_array( $form ) ? $form : [],
-                $translations,
-                [],
-                $language_code
-            ),
-        ];
-    }
-
-    /**
-     * Import completed listing ATE UI fields into the translated directory layout.
-     *
-     * Layout text belongs to the directory language, so one completed listing
-     * updates that translated directory globally instead of adding frontend
-     * per-listing filters.
-     *
-     * @param int    $source_listing_id Source listing ID.
-     * @param array  $fields            Completed WPML fields.
-     * @param string $language_code     Target language.
-     * @return void
-     */
-    private function sync_translated_listing_ui_strings( $source_listing_id, array $fields, $language_code ) {
-        $source_strings = get_post_meta( $source_listing_id, self::UI_META_KEY, true );
-        if ( ! is_array( $source_strings ) || empty( $source_strings ) ) {
-            return;
-        }
-
-        $translations = $this->get_completed_listing_ui_translations( $fields );
-        if ( empty( $translations ) ) {
-            return;
-        }
-
-        $source_directory_id = $this->get_valid_directory_type_id( $source_listing_id );
-        $target_directory_id = $this->get_translated_directory_type_id( $source_directory_id, $language_code );
-
-        if ( $target_directory_id <= 0 || $target_directory_id === $source_directory_id ) {
-            return;
-        }
-
-        $source = $this->get_directory_listing_layouts( $source_directory_id );
-        $target = $this->get_directory_listing_layouts( $target_directory_id );
-        $package = Directory_Builder_String_Package::instance();
-        if ( ! $package ) {
-            return;
-        }
-
-        $meta_map = [
-            'single_listing_header'    => 'header',
-            'single_listings_contents' => 'contents',
-            'submission_form_fields'   => 'form',
-        ];
-
-        $updated = false;
-        foreach ( $meta_map as $meta_key => $alias ) {
-            $translated_value = $package->apply_translatable_meta_string_map(
-                $meta_key,
-                is_array( $source[ $alias ] ) ? $source[ $alias ] : [],
-                $translations,
-                is_array( $target[ $alias ] ) ? $target[ $alias ] : [],
-                $language_code
-            );
-
-            if ( $translated_value === $target[ $alias ] ) {
-                continue;
-            }
-
-            update_term_meta( $target_directory_id, $meta_key, $translated_value );
-            $updated = true;
-        }
-
-        if ( $updated ) {
-            clean_term_cache( $target_directory_id, ATBDP_DIRECTORY_TYPE );
-        }
-    }
-
-    /**
-     * Decode the listing UI portion of a completed WPML job.
-     *
-     * @param array $fields Completed WPML fields.
-     * @return array
-     */
-    private function get_completed_listing_ui_translations( array $fields ) {
-        $translations = [];
-        $field_prefix = 'field-' . self::UI_META_KEY . '-0-';
-
-        foreach ( $fields as $field_id => $field ) {
-            if ( ! is_array( $field ) ) {
-                continue;
-            }
-
-            $field_type = ! empty( $field['field_type'] ) ? (string) $field['field_type'] : (string) $field_id;
-            if ( 0 !== strpos( $field_type, $field_prefix ) ) {
-                continue;
-            }
-
-            $key = substr( $field_type, strlen( $field_prefix ) );
-            if ( '' === $key || '-name' === substr( $key, -5 ) || '-type' === substr( $key, -5 ) ) {
-                continue;
-            }
-
-            $translations[ $key ] = isset( $field['data'] ) && is_string( $field['data'] ) ? trim( $field['data'] ) : '';
-        }
-
-        return $translations;
-    }
-
-    /**
-     * Get the three source-of-truth listing layouts without metadata filters.
-     *
-     * @param int $directory_id Directory type ID.
-     * @return array
-     */
-    private function get_directory_listing_layouts( $directory_id ) {
-        return [
-            'header'   => $this->get_raw_term_meta( $directory_id, 'single_listing_header' ),
-            'contents' => $this->get_raw_term_meta( $directory_id, 'single_listings_contents' ),
-            'form'     => $this->get_raw_term_meta( $directory_id, 'submission_form_fields' ),
-        ];
     }
 
     /**
@@ -584,28 +387,7 @@ class Listings_Actions {
     }
 
     /**
-     * Get raw term meta without translation filters.
-     *
-     * @param int    $term_id  Directory term ID.
-     * @param string $meta_key Meta key.
-     * @return mixed
-     */
-    private function get_raw_term_meta( $term_id, $meta_key ) {
-        global $wpdb;
-
-        $value = $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT meta_value FROM {$wpdb->termmeta} WHERE term_id = %d AND meta_key = %s ORDER BY meta_id ASC LIMIT 1",
-                absint( $term_id ),
-                $meta_key
-            )
-        );
-
-        return null === $value ? '' : maybe_unserialize( $value );
-    }
-
-    /**
-     * Mark existing listing translations stale when their exact UI inventory changes.
+     * Mark existing listing translations stale when their legacy UI payload is removed.
      *
      * @param int $source_listing_id Source listing ID.
      * @return void

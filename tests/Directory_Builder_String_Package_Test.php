@@ -310,7 +310,7 @@ $sectioned_form_strings = $package->get_translatable_meta_string_map( 'submissio
 assert_same(
 	array( 'Section', 'General Section', 'Opening hours', 'Food &amp; Facilities' ),
 	array_values( $sectioned_form_strings ),
-	'Listing ATE packages must keep real field and section labels without repeated builder fallback captions.'
+	'Directory Builder packages must keep real field and section labels without repeated builder fallback captions.'
 );
 assert_same( false, isset( $sectioned_form_strings['builder_submission_form_fields__groups__3__label'] ), 'An untouched group label that equals its fallback caption must stay out of ATE.' );
 
