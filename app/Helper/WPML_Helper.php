@@ -7,6 +7,21 @@ use Directorist_WPML_Integration\Helper\Response;
 class WPML_Helper {
 
     /**
+     * Raw taxonomy ID mappings for the current blog and term-cache generation.
+     *
+     * These IDs do not depend on the active WPML language. Do not cache the
+     * language-dependent translation results alongside them.
+     *
+     * @var array
+     */
+    private static $term_id_mappings = [];
+
+    /**
+     * @var string
+     */
+    private static $term_id_mapping_context = '';
+
+    /**
      * Set post translation
      * 
      * @param int $original_post_id 0
@@ -418,21 +433,7 @@ class WPML_Helper {
      * @return int
      */
     private static function get_term_taxonomy_id( $term_id, $taxonomy ) {
-        global $wpdb;
-
-        $term_id = (int) $term_id;
-
-        if ( $term_id <= 0 || empty( $taxonomy ) || ! isset( $wpdb->term_taxonomy ) ) {
-            return 0;
-        }
-
-        return (int) $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy} WHERE term_id = %d AND taxonomy = %s LIMIT 1",
-                $term_id,
-                $taxonomy
-            )
-        );
+        return self::get_cached_term_id_mapping( $term_id, $taxonomy, false );
     }
 
     /**
@@ -443,21 +444,50 @@ class WPML_Helper {
      * @return int
      */
     private static function get_term_id_from_term_taxonomy_id( $term_taxonomy_id, $taxonomy ) {
+        return self::get_cached_term_id_mapping( $term_taxonomy_id, $taxonomy, true );
+    }
+
+    /**
+     * Reuse raw ID lookups while respecting term edits and multisite switches.
+     *
+     * @param int    $element_id       Term ID or term taxonomy ID.
+     * @param string $taxonomy         Taxonomy name.
+     * @param bool   $from_taxonomy_id Whether the input is a term taxonomy ID.
+     * @return int
+     */
+    private static function get_cached_term_id_mapping( $element_id, $taxonomy, $from_taxonomy_id ) {
         global $wpdb;
 
-        $term_taxonomy_id = (int) $term_taxonomy_id;
+        $element_id = (int) $element_id;
 
-        if ( $term_taxonomy_id <= 0 || empty( $taxonomy ) || ! isset( $wpdb->term_taxonomy ) ) {
+        if ( $element_id <= 0 || empty( $taxonomy ) || ! isset( $wpdb->term_taxonomy ) ) {
             return 0;
         }
 
-        return (int) $wpdb->get_var(
+        $context = $wpdb->term_taxonomy . ':' . (string) wp_cache_get( 'last_changed', 'terms' );
+        if ( self::$term_id_mapping_context !== $context ) {
+            self::$term_id_mappings        = [];
+            self::$term_id_mapping_context = $context;
+        }
+
+        $cache_key = ( $from_taxonomy_id ? 'tt:' : 'term:' ) . $taxonomy . ':' . $element_id;
+        if ( array_key_exists( $cache_key, self::$term_id_mappings ) ) {
+            return self::$term_id_mappings[ $cache_key ];
+        }
+
+        $query = $from_taxonomy_id
+            ? "SELECT term_id FROM {$wpdb->term_taxonomy} WHERE term_taxonomy_id = %d AND taxonomy = %s LIMIT 1"
+            : "SELECT term_taxonomy_id FROM {$wpdb->term_taxonomy} WHERE term_id = %d AND taxonomy = %s LIMIT 1";
+
+        self::$term_id_mappings[ $cache_key ] = (int) $wpdb->get_var(
             $wpdb->prepare(
-                "SELECT term_id FROM {$wpdb->term_taxonomy} WHERE term_taxonomy_id = %d AND taxonomy = %s LIMIT 1",
-                $term_taxonomy_id,
+                $query,
+                $element_id,
                 $taxonomy
             )
         );
+
+        return self::$term_id_mappings[ $cache_key ];
     }
 
 }

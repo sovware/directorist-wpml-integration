@@ -2,6 +2,7 @@
 
 namespace Directorist_WPML_Integration\Controller\Hook;
 
+use Directorist_WPML_Integration\Helper\Raw_Term_Meta;
 use Directorist_WPML_Integration\Helper\WPML_Helper;
 
 class Directory_Type_Meta_Translation {
@@ -271,15 +272,7 @@ class Directory_Type_Meta_Translation {
      * @return bool
      */
     private function term_meta_exists( $term_id, $meta_key ) {
-        global $wpdb;
-
-        return (bool) $wpdb->get_var(
-            $wpdb->prepare(
-                "SELECT meta_id FROM {$wpdb->termmeta} WHERE term_id = %d AND meta_key = %s LIMIT 1",
-                (int) $term_id,
-                $meta_key
-            )
-        );
+        return [] !== Raw_Term_Meta::get_values( $term_id, $meta_key );
     }
 
     /**
