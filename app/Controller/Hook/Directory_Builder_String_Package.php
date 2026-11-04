@@ -11,6 +11,7 @@
 
 namespace Directorist_WPML_Integration\Controller\Hook;
 
+use Directorist_WPML_Integration\Helper\Raw_Term_Meta;
 use Directorist_WPML_Integration\Helper\WPML_Helper;
 
 class Directory_Builder_String_Package {
@@ -3624,17 +3625,7 @@ class Directory_Builder_String_Package {
      * @return mixed
      */
     private function get_raw_term_meta( $term_id, $meta_key, $single = true ) {
-        $term_id = (int) $term_id;
-        $cache   = wp_cache_get( $term_id, 'term_meta' );
-
-        // Read the raw core cache so metadata translation filters do not run
-        // recursively. WordPress invalidates this cache when term meta changes.
-        if ( false === $cache ) {
-            $meta_cache = update_meta_cache( 'term', [ $term_id ] );
-            $cache      = isset( $meta_cache[ $term_id ] ) ? $meta_cache[ $term_id ] : [];
-        }
-
-        $values = isset( $cache[ $meta_key ] ) ? $cache[ $meta_key ] : [];
+        $values = Raw_Term_Meta::get_values( $term_id, $meta_key );
 
         if ( empty( $values ) ) {
             return $single ? '' : [];

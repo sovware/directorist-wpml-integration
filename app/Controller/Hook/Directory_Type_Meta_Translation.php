@@ -2,6 +2,7 @@
 
 namespace Directorist_WPML_Integration\Controller\Hook;
 
+use Directorist_WPML_Integration\Helper\Raw_Term_Meta;
 use Directorist_WPML_Integration\Helper\WPML_Helper;
 
 class Directory_Type_Meta_Translation {
@@ -271,15 +272,7 @@ class Directory_Type_Meta_Translation {
      * @return bool
      */
     private function term_meta_exists( $term_id, $meta_key ) {
-        $term_id = (int) $term_id;
-        $cache   = wp_cache_get( $term_id, 'term_meta' );
-
-        if ( false === $cache ) {
-            $meta_cache = update_meta_cache( 'term', [ $term_id ] );
-            $cache      = isset( $meta_cache[ $term_id ] ) ? $meta_cache[ $term_id ] : [];
-        }
-
-        return isset( $cache[ $meta_key ] );
+        return [] !== Raw_Term_Meta::get_values( $term_id, $meta_key );
     }
 
     /**

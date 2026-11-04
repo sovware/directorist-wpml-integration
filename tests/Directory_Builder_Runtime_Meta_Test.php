@@ -87,7 +87,33 @@ namespace {
 
 	function update_term_meta( $term_id, $meta_key, $value ) {
 		$GLOBALS['wpdb']->meta[ (int) $term_id ][ $meta_key ] = $value;
+		wp_cache_delete( (int) $term_id, 'term_meta' );
 		return true;
+	}
+
+	function delete_term_meta( $term_id, $meta_key ) {
+		unset( $GLOBALS['wpdb']->meta[ (int) $term_id ][ $meta_key ] );
+		wp_cache_delete( (int) $term_id, 'term_meta' );
+	}
+
+	function wp_cache_get( $key, $group ) {
+		return $GLOBALS['runtime_meta_cache'][ $group ][ $key ] ?? false;
+	}
+
+	function wp_cache_delete( $key, $group ) {
+		unset( $GLOBALS['runtime_meta_cache'][ $group ][ $key ] );
+	}
+
+	function update_meta_cache( $type, $ids ) {
+		$cache = array();
+		foreach ( $ids as $id ) {
+			$cache[ $id ] = array();
+			foreach ( $GLOBALS['wpdb']->meta[ $id ] ?? array() as $key => $value ) {
+				$cache[ $id ][ $key ] = array( serialize( $value ) );
+			}
+			$GLOBALS['runtime_meta_cache'][ $type . '_meta' ][ $id ] = $cache[ $id ];
+		}
+		return $cache;
 	}
 
 	function clean_term_cache() {
@@ -128,6 +154,8 @@ namespace {
 		public $termmeta = 'wp_termmeta';
 		public $prefix   = 'wp_';
 		public $meta     = array();
+		public $case_sensitive = false;
+		public $raw_reads = 0;
 
 		public function prepare( $query, ...$args ) {
 			return $args;
@@ -141,9 +169,15 @@ namespace {
 		}
 
 		public function get_col( $args ) {
-			$value = $this->get_var( $args );
-
-			return null === $value ? array() : array( $value );
+			++$this->raw_reads;
+			$values = array();
+			foreach ( $this->meta[ (int) $args[0] ] ?? array() as $key => $value ) {
+				$matches = $this->case_sensitive ? $key === $args[1] : 0 === strcasecmp( $key, $args[1] );
+				if ( $matches ) {
+					$values[] = serialize( $value );
+				}
+			}
+			return $values;
 		}
 	}
 }
@@ -180,10 +214,13 @@ namespace Directorist_WPML_Integration\Helper {
 }
 
 namespace {
+	require_once dirname( __DIR__ ) . '/app/Helper/Raw_Term_Meta.php';
 	require_once dirname( __DIR__ ) . '/app/Controller/Hook/Directory_Builder_String_Package.php';
+	require_once dirname( __DIR__ ) . '/app/Controller/Hook/Directory_Type_Meta_Translation.php';
 	require_once dirname( __DIR__ ) . '/app/Controller/Hook/Listings_Actions.php';
 
 	use Directorist_WPML_Integration\Controller\Hook\Directory_Builder_String_Package;
+	use Directorist_WPML_Integration\Controller\Hook\Directory_Type_Meta_Translation;
 	use Directorist_WPML_Integration\Controller\Hook\Listings_Actions;
 
 	function assert_runtime_same( $expected, $actual, $message ) {
@@ -270,6 +307,44 @@ namespace {
 	assert_runtime_same( 'Bladwijzer', $filtered[0][0]['selectedWidgets'][0]['options']['fields']['label']['value'], 'The normal runtime filter must preserve the completed target option value.' );
 	assert_runtime_same( 'la la-heart-o', $filtered[0][0]['selectedWidgets'][0]['icon'], 'The normal runtime filter must keep non-translatable configuration aligned with the source layout.' );
 	assert_runtime_same( 'Listing Title', $filtered[0][0]['selectedWidgets'][1]['label'], 'The normal runtime filter must not preserve translated internal widget captions.' );
+
+	$exists = new \ReflectionMethod( Directory_Type_Meta_Translation::class, 'term_meta_exists' );
+	$exists->setAccessible( true );
+	$meta_translation = new Directory_Type_Meta_Translation();
+	$raw_meta = new \ReflectionMethod( Directory_Builder_String_Package::class, 'get_raw_term_meta' );
+	$raw_meta->setAccessible( true );
+	$key = 'single_listing_header';
+	$reads = $GLOBALS['wpdb']->raw_reads;
+	$package->translate_builder_term_meta( null, 144, $key, true );
+	assert_runtime_same( true, $exists->invoke( $meta_translation, 144, $key ), 'Warmed metadata must exist.' );
+	assert_runtime_same( $reads, $GLOBALS['wpdb']->raw_reads, 'Warmed standard keys must not issue raw SQL lookups.' );
+
+	$edited_header = $persisted;
+	$edited_header[0]['selectedWidgets'][0]['label'] = 'Bijgewerkte bladwijzer';
+	update_term_meta( 144, $key, $edited_header );
+	$filtered = $package->translate_builder_term_meta( null, 144, $key, true );
+	assert_runtime_same( 'Bijgewerkte bladwijzer', $filtered[0][0]['selectedWidgets'][0]['label'], 'An edit must invalidate the warmed metadata cache.' );
+	delete_term_meta( 144, $key );
+	assert_runtime_same( false, $exists->invoke( $meta_translation, 144, $key ), 'A deleted override must stop existing immediately.' );
+	$filtered = $package->translate_builder_term_meta( null, 144, $key, true );
+	assert_runtime_same( 'Bookmark', $filtered[0][0]['selectedWidgets'][0]['label'], 'Deleting an override must restore the source label.' );
+
+	update_term_meta( 144, strtoupper( $key ), $persisted );
+	$filtered = $package->translate_builder_term_meta( null, 144, $key, true );
+	assert_runtime_same( 'Bladwijzer', $filtered[0][0]['selectedWidgets'][0]['label'], 'A saved override with different key casing must remain visible.' );
+	assert_runtime_same( true, $exists->invoke( $meta_translation, 144, $key ), 'The existence check must recognize the same cased override.' );
+	update_term_meta( 144, $key, $edited_header );
+	assert_runtime_same( array( $persisted, $edited_header ), $raw_meta->invoke( $package, 144, $key, false ), 'Matching key spellings must retain database row order.' );
+	assert_runtime_same( $persisted, $raw_meta->invoke( $package, 144, $key, true ), 'Single reads must select the first matching row.' );
+
+	$GLOBALS['wpdb']->case_sensitive = true;
+	assert_runtime_same( array( $edited_header ), $raw_meta->invoke( $package, 144, $key, false ), 'Case-sensitive collations must keep different key spellings separate.' );
+	delete_term_meta( 144, $key );
+	assert_runtime_same( false, $exists->invoke( $meta_translation, 144, $key ), 'A case-sensitive collation must not find the differently cased key.' );
+	$GLOBALS['wpdb']->case_sensitive = false;
+	delete_term_meta( 144, strtoupper( $key ) );
+	update_term_meta( 144, $key, '' );
+	assert_runtime_same( true, $exists->invoke( $meta_translation, 144, $key ), 'An explicitly empty metadata value must still exist.' );
 
 	echo "Directory Builder completion-to-runtime metadata test passed.\n";
 }
