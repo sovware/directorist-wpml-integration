@@ -3,6 +3,7 @@
 namespace Directorist_WPML_Integration\Controller\Hook;
 
 use Directorist_WPML_Integration\Helper\WPML_Helper;
+use WPML\TM\Jobs\TranslationRecord;
 
 class Listings_Actions {
 
@@ -24,6 +25,7 @@ class Listings_Actions {
         add_action( 'save_post_at_biz_dir', [ $this, 'clear_listing_ui_strings_on_save' ], 40, 3 );
         add_action( 'wpml_pb_register_all_strings_for_translation', [ $this, 'clear_listing_ui_strings_before_translation' ], 40 );
         add_filter( 'wpml_tm_translation_job_data', [ $this, 'filter_listing_translation_package' ], 40, 2 );
+        add_filter( 'wpml_tm_can_reuse_translation_job', [ $this, 'can_reuse_listing_translation_job' ], 20, 3 );
         add_action( 'directorist_after_update_directory_type', [ $this, 'clear_directory_listing_ui_strings' ], 40, 1 );
     }
 
@@ -113,6 +115,36 @@ class Listings_Actions {
         }
 
         return $package;
+    }
+
+    /**
+     * Rebuild completed ATE listing jobs that contain legacy Builder fields.
+     *
+     * ATE otherwise clones its old remote snapshot before the filtered local
+     * package is generated. Refusing reuse makes WPML create a fresh ATE job.
+     *
+     * @param bool        $can_reuse Whether WPML may reuse the job.
+     * @param object|null $job       Existing translation job record.
+     * @param array       $context   Source element details.
+     * @return bool
+     */
+    public function can_reuse_listing_translation_job( $can_reuse, $job, $context ) {
+        if ( ! $can_reuse || ! is_object( $job ) || empty( $job->job_id )
+            || 'post_' . ATBDP_POST_TYPE !== ( $context['element_type'] ?? '' )
+            || 'ate' !== ( $job->editor ?? '' ) || empty( $job->editor_job_id )
+            || ! TranslationRecord::isCompleted( $job ) ) {
+            return $can_reuse;
+        }
+
+        global $wpdb;
+
+        return ! $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT 1 FROM {$wpdb->prefix}icl_translate WHERE job_id = %d AND field_type LIKE %s LIMIT 1",
+                absint( $job->job_id ),
+                $wpdb->esc_like( 'field-' . self::UI_META_KEY . '-' ) . '%'
+            )
+        );
     }
 
     /**

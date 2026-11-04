@@ -114,15 +114,21 @@ namespace {
 	}
 
 	class Listing_UI_Test_Database {
-		public $termmeta = 'termmeta';
-		public $layouts  = array();
+		public $prefix = 'wp_';
+		public $legacy_job_ids = array( 91 );
+		public $queries = array();
 
-		public function prepare( $query, $term_id, $meta_key ) {
-			return $meta_key;
+		public function esc_like( $value ) {
+			return addcslashes( $value, '_%\\' );
 		}
 
-		public function get_var( $meta_key ) {
-			return isset( $this->layouts[ $meta_key ] ) ? $this->layouts[ $meta_key ] : array();
+		public function prepare( $query, ...$args ) {
+			return $args;
+		}
+
+		public function get_var( $args ) {
+			$this->queries[] = $args;
+			return in_array( (int) $args[0], $this->legacy_job_ids, true ) ? '1' : null;
 		}
 	}
 
@@ -172,6 +178,14 @@ namespace Directorist_WPML_Integration\Helper {
 			];
 
 			return isset( $languages[ $element_id ] ) ? (object) [ 'language_code' => $languages[ $element_id ], 'source_language_code' => 'en' === $languages[ $element_id ] ? null : 'en' ] : false;
+		}
+	}
+}
+
+namespace WPML\TM\Jobs {
+	class TranslationRecord {
+		public static function isCompleted( $job ) {
+			return ! empty( $job->translated ) || ! empty( $job->completed_date );
 		}
 	}
 }
@@ -282,6 +296,44 @@ namespace {
 	assert_same( $legacy_package, $filter( $legacy_package, new WP_Post( 127, 'page' ) ), 'Page UI translation fields must remain in page packages.' );
 	assert_same( $legacy_package, $filter( $legacy_package, (object) array( 'ID' => 127 ) ), 'External Directory Builder packages must remain unchanged.' );
 	assert_same( array(), $filter( array(), new WP_Post( 127 ) ), 'An empty translation package must remain empty.' );
+
+	assert_same( true, isset( $GLOBALS['registered_filters']['wpml_tm_can_reuse_translation_job'] ), 'Legacy ATE jobs must be checked before WPML decides to clone a completed remote job.' );
+	$reuse_filter = $GLOBALS['registered_filters']['wpml_tm_can_reuse_translation_job'];
+	$GLOBALS['wpdb'] = new Listing_UI_Test_Database();
+	$completed_ate_job = (object) array(
+		'job_id' => 91,
+		'editor' => 'ate',
+		'editor_job_id' => 9001,
+		'translated' => 1,
+	);
+	$listing_context = array( 'element_type' => 'post_at_biz_dir', 'element_id' => 127 );
+	unset( $GLOBALS['listing_ui_meta'][127] );
+	assert_same( false, $reuse_filter( true, $completed_ate_job, $listing_context ), 'A completed ATE job with legacy fields must be rebuilt even after its source metadata has been removed.' );
+	assert_same( array( 91, 'field-\_directorist\_wpml\_page\_ui\_strings-%' ), $GLOBALS['wpdb']->queries[0], 'The inventory lookup must match the exact legacy custom field prefix.' );
+
+	$clean_job = clone $completed_ate_job;
+	$clean_job->job_id = 92;
+	assert_same( true, $reuse_filter( true, $clean_job, $listing_context ), 'A completed ATE job with a clean field inventory must remain reusable.' );
+	$dated_job = clone $completed_ate_job;
+	$dated_job->translated = 0;
+	$dated_job->completed_date = '2026-01-01 00:00:00';
+	assert_same( false, $reuse_filter( true, $dated_job, $listing_context ), 'A job recorded as completed by date must also be checked for legacy fields.' );
+
+	$query_count = count( $GLOBALS['wpdb']->queries );
+	$pending_job = clone $completed_ate_job;
+	$pending_job->translated = 0;
+	assert_same( true, $reuse_filter( true, $pending_job, $listing_context ), 'In-progress ATE work must remain reusable.' );
+	$classic_job = clone $completed_ate_job;
+	$classic_job->editor = 'wpml';
+	assert_same( true, $reuse_filter( true, $classic_job, $listing_context ), 'Classic jobs must retain their existing reopen behavior.' );
+	$local_job = clone $completed_ate_job;
+	$local_job->editor_job_id = 0;
+	assert_same( true, $reuse_filter( true, $local_job, $listing_context ), 'Jobs without a remote ATE snapshot must retain their existing behavior.' );
+	assert_same( true, $reuse_filter( true, $completed_ate_job, array( 'element_type' => 'post_page' ) ), 'Completed page translations must remain reusable.' );
+	assert_same( true, $reuse_filter( true, $completed_ate_job, array( 'element_type' => 'package_directorist-directory-builder' ) ), 'Directory Builder packages must retain their normal reopen behavior.' );
+	assert_same( true, $reuse_filter( true, null, $listing_context ), 'Missing job records must be left to WPML.' );
+	assert_same( false, $reuse_filter( false, $clean_job, $listing_context ), 'Another filter refusing job reuse must remain authoritative.' );
+	assert_same( $query_count, count( $GLOBALS['wpdb']->queries ), 'Unrelated or in-progress jobs must not trigger inventory queries.' );
 
 	echo "Listing directory translation relationship tests passed.\n";
 }
