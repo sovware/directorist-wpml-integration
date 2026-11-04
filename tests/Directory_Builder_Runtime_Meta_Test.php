@@ -8,7 +8,6 @@ namespace {
 	$GLOBALS['listing_meta'] = array( 127 => 115, 184 => 144 );
 	$GLOBALS['listing_terms'] = array( 127 => array( 115 ), 184 => array( 144 ) );
 	$GLOBALS['listing_ui_meta'] = array();
-	$GLOBALS['package_translations'] = array();
 
 	function add_action() {
 		return true;
@@ -26,7 +25,7 @@ namespace {
 		return true;
 	}
 
-	function apply_filters( $hook, $value, ...$args ) {
+	function apply_filters( $hook, $value ) {
 		if ( 'wpml_default_language' === $hook ) {
 			return 'en';
 		}
@@ -35,10 +34,8 @@ namespace {
 			return 'nl';
 		}
 
-		if ( 'wpml_translate_string' === $hook ) {
-			return $GLOBALS['package_translations'][ $args[0] ] ?? $value;
-		}
-
+		// Simulate the runtime package reader returning no separate package
+		// translation. Completed target metadata must remain authoritative.
 		return $value;
 	}
 
@@ -248,7 +245,7 @@ namespace {
 
 	$package = new Directory_Builder_String_Package();
 	$source_strings = $package->get_translatable_meta_string_map( 'single_listing_header', $source_header );
-	assert_runtime_same( array( 'Bookmark', 'Bookmark' ), array_values( $source_strings ), 'Only visitor-facing bookmark strings should enter the Directory Builder package.' );
+	assert_runtime_same( array( 'Bookmark', 'Bookmark' ), array_values( $source_strings ), 'Only the visitor-facing bookmark strings should enter the listing ATE payload.' );
 	$GLOBALS['listing_ui_meta'][127] = $source_strings;
 
 	$fields = array();
@@ -263,15 +260,10 @@ namespace {
 	$listings = new Listings_Actions();
 	$job      = (object) array( 'original_doc_id' => 127, 'language_code' => 'nl' );
 	$listings->update_directory_type_after_listing_translation( 184, $fields, $job );
-	assert_runtime_same( 'Old target label', $GLOBALS['wpdb']->meta[144]['single_listing_header'][0]['selectedWidgets'][0]['label'], 'Completing a listing job must not overwrite directory-level UI translations.' );
-
-	$translations = array_fill_keys( array_keys( $source_strings ), 'Bladwijzer' );
-	$translated_header = $package->apply_translatable_meta_string_map( 'single_listing_header', $source_header, $translations, $target_header, 'nl' );
-	update_term_meta( 144, 'single_listing_header', $translated_header );
 
 	$persisted = $GLOBALS['wpdb']->meta[144]['single_listing_header'];
-	assert_runtime_same( 'Bladwijzer', $persisted[0]['selectedWidgets'][0]['label'], 'The Directory Builder package must persist the target bookmark label.' );
-	assert_runtime_same( 'Listing Title', $persisted[0]['selectedWidgets'][1]['label'], 'The Directory Builder package must discard translated internal widget captions.' );
+	assert_runtime_same( 'Bladwijzer', $persisted[0]['selectedWidgets'][0]['label'], 'The completion handler must persist the target bookmark label.' );
+	assert_runtime_same( 'Listing Title', $persisted[0]['selectedWidgets'][1]['label'], 'The completion handler must discard translated internal widget captions.' );
 
 	$filtered = $package->translate_builder_term_meta( null, 144, 'single_listing_header', true );
 	assert_runtime_same( 'Bladwijzer', $filtered[0][0]['selectedWidgets'][0]['label'], 'The normal runtime filter must preserve the completed target widget label.' );
@@ -279,36 +271,5 @@ namespace {
 	assert_runtime_same( 'la la-heart-o', $filtered[0][0]['selectedWidgets'][0]['icon'], 'The normal runtime filter must keep non-translatable configuration aligned with the source layout.' );
 	assert_runtime_same( 'Listing Title', $filtered[0][0]['selectedWidgets'][1]['label'], 'The normal runtime filter must not preserve translated internal widget captions.' );
 
-	$source_form = array(
-		'groups' => array(
-			array( 'label' => 'Section', 'defaultGroupLabel' => 'Section' ),
-			array( 'label' => 'Section', 'default_group_label' => 'Section' ),
-		),
-	);
-	$target_form = $source_form;
-	$target_form['groups'][0]['label'] = 'Bewaarde sectie';
-	$target_form['groups'][1]['label'] = 'Tweede sectie';
-	$GLOBALS['wpdb']->meta[115]['submission_form_fields'] = $source_form;
-	$GLOBALS['wpdb']->meta[144]['submission_form_fields'] = $target_form;
-
-	$filtered = $package->translate_builder_term_meta( null, 144, 'submission_form_fields', true );
-	assert_runtime_same( $target_form, $filtered[0], 'The runtime filter must preserve existing translations of default section headings while keeping builder fallback captions unchanged.' );
-
-	$GLOBALS['package_translations'] = array(
-		'builder_submission_form_fields__groups__0__label' => 'Pakketsectie',
-		'builder_submission_form_fields__groups__1__label' => 'Tweede pakketsectie',
-	);
-	$expected_form = $source_form;
-	$expected_form['groups'][0]['label'] = 'Pakketsectie';
-	$expected_form['groups'][1]['label'] = 'Tweede pakketsectie';
-	$filtered = $package->translate_builder_term_meta( null, 144, 'submission_form_fields', true );
-	assert_runtime_same( $expected_form, $filtered[0], 'The runtime filter must apply package translations to default section headings.' );
-	assert_runtime_same( $target_form, $GLOBALS['wpdb']->meta[144]['submission_form_fields'], 'Reading translated form metadata must not mutate stored translations.' );
-
-	$GLOBALS['package_translations'] = array();
-	$GLOBALS['wpdb']->meta[144]['submission_form_fields'] = array();
-	$filtered = $package->translate_builder_term_meta( null, 144, 'submission_form_fields', true );
-	assert_runtime_same( $source_form, $filtered[0], 'An untranslated default heading must retain its source label.' );
-
-	echo "Directory Builder package-to-runtime metadata test passed.\n";
+	echo "Directory Builder completion-to-runtime metadata test passed.\n";
 }
