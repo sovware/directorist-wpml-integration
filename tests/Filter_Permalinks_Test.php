@@ -50,7 +50,17 @@ function apply_filters( $hook, $value, ...$args ) {
 }
 
 function get_post_status( $post_id ) {
-	return in_array( (int) $post_id, [ 1282, 1291 ], true ) ? 'publish' : false;
+	global $test_translation_status;
+
+	return in_array( (int) $post_id, [ 1282, 1291 ], true ) ? $test_translation_status : false;
+}
+
+function is_post_publicly_viewable( $post_id ) {
+	return 'publish' === get_post_status( $post_id );
+}
+
+function urlencode_deep( $value ) {
+	return is_array( $value ) ? array_map( 'urlencode_deep', $value ) : urlencode( $value );
 }
 
 function get_permalink( $post_id ) {
@@ -72,10 +82,11 @@ function wp_parse_url( $url, $component = -1 ) {
 function add_query_arg( $query_args, $url ) {
 	$query = parse_url( $url, PHP_URL_QUERY );
 	parse_str( (string) $query, $existing_args );
-	$args = array_merge( $existing_args, $query_args );
+	$args = array_merge( urlencode_deep( $existing_args ), $query_args );
 	$base = strtok( $url, '?' );
 
-	return $base . ( $args ? '?' . http_build_query( $args ) : '' );
+	// WordPress expects new query values to be encoded by the caller.
+	return $base . ( $args ? '?' . urldecode( http_build_query( $args ) ) : '' );
 }
 
 require_once dirname( __DIR__ ) . '/app/Controller/Hook/Filter_Permalinks.php';
@@ -93,10 +104,11 @@ function assert_same( $expected, $actual, $message ) {
 	exit( 1 );
 }
 
-$test_has_wpml_filter  = true;
-$test_is_admin         = false;
-$test_current_language = 'en';
-$permalinks           = new Filter_Permalinks();
+$test_has_wpml_filter    = true;
+$test_is_admin           = false;
+$test_current_language   = 'en';
+$test_translation_status = 'publish';
+$permalinks              = new Filter_Permalinks();
 
 assert_same(
 	'https://example.com/en/add-a-listing/',
@@ -116,6 +128,40 @@ assert_same(
 	'The translated Divi Homepage Search route must use the translated Directorist Search Result page.'
 );
 
+$query_args = [
+	'plan'         => '3',
+	'listing_type' => 'general-directory-en',
+	'label'        => 'A&B#C+D %',
+	'filters'      => [ 'tag' => 'Food & Drink' ],
+];
+$url = $permalinks->filter_add_listing_page_url( 'https://example.com/en/?' . http_build_query( $query_args ) );
+parse_str( (string) parse_url( $url, PHP_URL_QUERY ), $actual_query_args );
+
+assert_same( $query_args, $actual_query_args, 'Encoded scalar and nested query values must survive the Add Listing URL rewrite.' );
+assert_same( null, parse_url( $url, PHP_URL_FRAGMENT ), 'Encoded query characters must not become URL fragments.' );
+
+foreach ( [ 'draft', 'pending', 'future', 'private', 'trash', false ] as $status ) {
+	$test_translation_status = $status;
+	$fallback = 'https://example.com/en/?plan=3&listing_type=general-directory-en';
+
+	assert_same(
+		$fallback,
+		$permalinks->filter_add_listing_page_url( $fallback ),
+		'Unpublished Add Listing translations must preserve the existing URL.'
+	);
+	assert_same(
+		'https://example.com/en/',
+		$permalinks->filter_search_result_page_url( 'https://example.com/en/' ),
+		'Unpublished Search Result translations must preserve the existing URL.'
+	);
+	assert_same(
+		'https://example.com/en/',
+		$permalinks->filter_divi_home_search_result_base_url( 'https://example.com/en/' ),
+		'Unpublished Search Result translations must preserve the Divi Homepage Search route.'
+	);
+}
+
+$test_translation_status = 'publish';
 $test_current_language = 'es';
 
 assert_same(

@@ -591,7 +591,7 @@ class Filter_Permalinks {
             $current_language
         );
 
-        if ( empty( $translated_page_id ) || ! get_post_status( $translated_page_id ) ) {
+        if ( empty( $translated_page_id ) || ! is_post_publicly_viewable( (int) $translated_page_id ) ) {
             return $url;
         }
 
@@ -604,7 +604,7 @@ class Filter_Permalinks {
         if ( is_string( $query ) && '' !== $query ) {
             parse_str( $query, $query_args );
             if ( ! empty( $query_args ) ) {
-                $translated_url = add_query_arg( $query_args, $translated_url );
+                $translated_url = add_query_arg( urlencode_deep( $query_args ), $translated_url );
             }
         }
 
@@ -645,7 +645,7 @@ class Filter_Permalinks {
             $current_language
         );
 
-        if ( empty( $translated_page_id ) || ! get_post_status( $translated_page_id ) ) {
+        if ( empty( $translated_page_id ) || ! is_post_publicly_viewable( (int) $translated_page_id ) ) {
             return $url;
         }
 
