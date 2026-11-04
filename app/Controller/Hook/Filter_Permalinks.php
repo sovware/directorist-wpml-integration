@@ -229,10 +229,41 @@ class Filter_Permalinks {
      * @return string Link
      */
     public function filter_single_taxonomy_page_url( $args = [] ) {
-        // Core already builds the taxonomy URL, including pretty/plain permalink
-        // handling and the term slug. Rebuilding from the page URL here discards
-        // native archive URLs and collapses links when term metadata is missing.
-        return isset( $args['link'] ) ? $args['link'] : '';
+        $link = isset( $args['link'] ) ? $args['link'] : '';
+        $term = isset( $args['term'] ) ? $args['term'] : null;
+
+        if ( empty( $args['page_id'] ) || empty( $args['query_arg_key'] ) || empty( $term->slug ) || is_wp_error( $term ) ) {
+            return $link;
+        }
+
+        $base_url = get_permalink( $args['page_id'] );
+        $pretty   = get_option( 'permalink_structure' );
+
+        // Preserve native pretty paths and archive URLs. Older Core versions
+        // append the term after the query string in WPML parameter mode.
+        if ( ! $base_url || ( $pretty && false === strpos( $base_url, '?' ) ) ) {
+            return $link;
+        }
+
+        $query_key = $args['query_arg_key'];
+        if ( $pretty ) {
+            $legacy_link = user_trailingslashit( trailingslashit( $base_url ) . $term->slug );
+            $correct_url = \Directorist\Helper::join_slug_to_url( $base_url, $term->slug );
+        } else {
+            // Older Core versions use the filter name as the plain tag key.
+            $legacy_key  = 'atbdp_tag' === $query_key ? 'atbdp_single_tag' : $query_key;
+            $legacy_link = add_query_arg( $legacy_key, $term->slug, $base_url );
+            $correct_url = add_query_arg( $query_key, $term->slug, $base_url );
+        }
+
+        if ( ! empty( $args['directory_type'] ) && 'all' !== $args['directory_type'] ) {
+            $legacy_link .= '?directory_type=' . $args['directory_type'];
+            $correct_url  = add_query_arg( 'directory_type', $args['directory_type'], $correct_url );
+        }
+
+        // Repair only the known Core output, retaining links supplied by other
+        // permalink implementations and versions that already build valid URLs.
+        return $link === $legacy_link ? $correct_url : $link;
     }
 
     /**
@@ -245,7 +276,10 @@ class Filter_Permalinks {
      */
     public function filter_lang_switcher_url_for_generic_pages( $url = '', $data = [] ) {
         if ( ! empty( $_REQUEST ) ) {
-            $url = add_query_arg( $_REQUEST, $url );
+            $query_args = $_REQUEST;
+            // WPML supplies the target page and language in the incoming URL.
+            unset( $query_args['lang'], $query_args['page_id'], $query_args['p'], $query_args['pagename'], $query_args['name'] );
+            $url = add_query_arg( $query_args, $url );
         }
 
         // Pagination
@@ -293,10 +327,6 @@ class Filter_Permalinks {
 
         if ( ! $is_archive_page ) {
             return $url;
-        }
-
-        if ( ! empty( $_REQUEST ) ) {
-            $url = add_query_arg( $_REQUEST, $url );
         }
 
         // Pagination
@@ -372,8 +402,8 @@ class Filter_Permalinks {
 
         $taxonomy_data = $this->get_current_page_taxonomy_data();
 
-        if ( $taxonomy_data ) {
-            $lang = $data['tag'];
+        if ( $taxonomy_data && ! empty( $data['code'] ) ) {
+            $lang = $data['code'];
 
             return $this->get_formated_single_taxonomy_page_url( $url, $taxonomy_data, $lang );
         }
