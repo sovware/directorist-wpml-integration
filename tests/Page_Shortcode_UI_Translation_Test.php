@@ -169,8 +169,15 @@ $apply_shortcode_dynamic_output_aliases->setAccessible( true );
 $replace_shortcode_dynamic_fragments = $reflection->getMethod( 'replace_shortcode_dynamic_fragments' );
 $replace_shortcode_dynamic_fragments->setAccessible( true );
 
+$resolve_directory_id = $reflection->getMethod( 'resolve_directory_id' );
+$resolve_directory_id->setAccessible( true );
+
 $current_page_map = $reflection->getProperty( 'current_page_map' );
 $current_page_map->setAccessible( true );
+
+assert_same( 146, $resolve_directory_id->invoke( $translator, [ [ '146' ] ] ), 'Nested directory attributes must resolve without array-to-string warnings.' );
+assert_same( 146, $resolve_directory_id->invoke( $translator, (object) [ 'term_id' => 146 ] ), 'Directory term objects must resolve by term ID.' );
+assert_same( 0, $resolve_directory_id->invoke( $translator, [ [] ] ), 'Empty nested directory attributes must resolve to zero.' );
 
 $source_strings = [
 	'general'       => 'General Information',

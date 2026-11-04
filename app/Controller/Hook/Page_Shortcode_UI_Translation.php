@@ -2539,8 +2539,20 @@ class Page_Shortcode_UI_Translation {
 	 * @return int
 	 */
 	private function resolve_directory_id( $value ) {
-		if ( is_array( $value ) ) {
+		while ( is_array( $value ) ) {
+			if ( empty( $value ) ) {
+				return 0;
+			}
+
 			$value = reset( $value );
+		}
+
+		if ( is_object( $value ) && isset( $value->term_id ) ) {
+			$value = $value->term_id;
+		}
+
+		if ( ! is_scalar( $value ) ) {
+			return 0;
 		}
 
 		$value = trim( (string) $value );
