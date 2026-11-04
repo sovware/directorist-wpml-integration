@@ -23,6 +23,7 @@ class Listings_Actions {
         add_filter( 'wpml_pro_translation_completed', [ $this, 'update_directory_type_after_listing_translation' ], 20, 3 );
         add_action( 'save_post_at_biz_dir', [ $this, 'clear_listing_ui_strings_on_save' ], 40, 3 );
         add_action( 'wpml_pb_register_all_strings_for_translation', [ $this, 'clear_listing_ui_strings_before_translation' ], 40 );
+        add_filter( 'wpml_tm_translation_job_data', [ $this, 'filter_listing_translation_package' ], 40, 2 );
         add_action( 'directorist_after_update_directory_type', [ $this, 'clear_directory_listing_ui_strings' ], 40, 1 );
     }
 
@@ -86,6 +87,32 @@ class Listings_Actions {
         }
 
         $this->clear_listing_ui_strings( $post->ID );
+    }
+
+    /**
+     * Exclude legacy Builder fields from every generated listing package.
+     *
+     * Reopening a completed translation can bypass WPML's preparation action.
+     * Filter the package itself so stored legacy fields cannot enter that job.
+     *
+     * @param array           $package WPML translation package.
+     * @param \WP_Post|object $post    Source post or external package.
+     * @return array
+     */
+    public function filter_listing_translation_package( $package, $post ) {
+        if ( ! $post instanceof \WP_Post || ATBDP_POST_TYPE !== $post->post_type || empty( $package['contents'] ) ) {
+            return $package;
+        }
+
+        $field_prefix = 'field-' . self::UI_META_KEY . '-';
+
+        foreach ( array_keys( $package['contents'] ) as $field_type ) {
+            if ( 0 === strpos( $field_type, $field_prefix ) ) {
+                unset( $package['contents'][ $field_type ] );
+            }
+        }
+
+        return $package;
     }
 
     /**

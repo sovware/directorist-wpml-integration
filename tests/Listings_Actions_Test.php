@@ -126,7 +126,8 @@ namespace {
 		}
 	}
 
-	function add_filter() {
+	function add_filter( $hook, $callback = null ) {
+		$GLOBALS['registered_filters'][ $hook ] = $callback;
 		return true;
 	}
 }
@@ -250,6 +251,37 @@ namespace {
 
 	$hook_listings->clear_listing_ui_strings_on_save( 127, new WP_Post( 127, 'page' ), true );
 	assert_same( 3, $GLOBALS['ui_meta_writes'], 'Saving other post types must not affect listing meta.' );
+
+	// Reopening a completed job builds its package without the preparation action.
+	$legacy_ui = array( 'builder_submission_form_fields__fields__textarea__placeholder' => 'Opening hours' );
+	$GLOBALS['listing_ui_meta'][127] = $legacy_ui;
+	$expected_package = array(
+		'title' => 'Listing translation',
+		'type' => 'post',
+		'contents' => array(
+			'original_id' => array( 'translate' => 0, 'data' => 127 ),
+			'title' => array( 'translate' => 1, 'data' => 'Listing title' ),
+			'body' => array( 'translate' => 1, 'data' => 'Listing description' ),
+			'field-_phone-0' => array( 'translate' => 1, 'data' => '555-0100' ),
+			'field-_directorist_wpml_page_ui_strings_hash-0' => array( 'translate' => 0, 'data' => 'hash' ),
+		),
+	);
+	$legacy_package = $expected_package;
+	foreach ( array( '0-builder_submission_form_fields__fields__textarea__placeholder', '1' ) as $index ) {
+		$field = 'field-_directorist_wpml_page_ui_strings-' . $index;
+		$legacy_package['contents'][ $field ] = array( 'translate' => 1, 'data' => 'Opening hours' );
+		$legacy_package['contents'][ $field . '-name' ] = array( 'translate' => 0, 'data' => $field );
+		$legacy_package['contents'][ $field . '-type' ] = array( 'translate' => 0, 'data' => 'custom_field' );
+	}
+	assert_same( true, isset( $GLOBALS['registered_filters']['wpml_tm_translation_job_data'] ), 'Listing payloads must be filtered even when WPML skips its preparation action.' );
+	$filter = $GLOBALS['registered_filters']['wpml_tm_translation_job_data'];
+	$filtered_package = $filter( $legacy_package, new WP_Post( 127 ) );
+	assert_same( $expected_package, $filtered_package, 'Reopened jobs must omit every legacy UI field and its metadata while retaining listing content and unrelated fields.' );
+	assert_same( $expected_package, $filter( $filtered_package, new WP_Post( 127 ) ), 'Filtering an already clean listing package must be idempotent.' );
+	assert_same( $legacy_ui, $GLOBALS['listing_ui_meta'][127], 'Building a package must not change stored metadata or translation status.' );
+	assert_same( $legacy_package, $filter( $legacy_package, new WP_Post( 127, 'page' ) ), 'Page UI translation fields must remain in page packages.' );
+	assert_same( $legacy_package, $filter( $legacy_package, (object) array( 'ID' => 127 ) ), 'External Directory Builder packages must remain unchanged.' );
+	assert_same( array(), $filter( array(), new WP_Post( 127 ) ), 'An empty translation package must remain empty.' );
 
 	echo "Listing directory translation relationship tests passed.\n";
 }
