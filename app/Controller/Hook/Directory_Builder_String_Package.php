@@ -3103,6 +3103,15 @@ class Directory_Builder_String_Package {
             }
         }
 
+        if ( 'submission_form_fields' === $meta_key && in_array( 'groups', $path, true ) ) {
+            if ( in_array( $key, [ 'default_group_label', 'defaultgrouplabel' ], true ) ) {
+                // The builder fallback caption is internal configuration.
+                // The group's label is visitor-facing even when it matches
+                // that caption and must remain translatable.
+                return false;
+            }
+        }
+
         if ( 'value' === $key && $this->is_visual_builder_option_value_path( $path ) ) {
             return true;
         }
