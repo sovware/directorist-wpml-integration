@@ -12,6 +12,15 @@ class Query_Filtering {
      * @return void
      */
     public function __construct() {
+        /**
+         * Enable Directorist query filtering independently of builder translation.
+         *
+         * @param bool $enabled Whether query filtering should run.
+         */
+        if ( ! apply_filters( 'directorist_wpml_enable_query_filtering', true ) ) {
+            return;
+        }
+
         // Filter listing queries to show only current language
         add_action( 'pre_get_posts', [ $this, 'filter_listing_queries' ], 10, 1 );
         

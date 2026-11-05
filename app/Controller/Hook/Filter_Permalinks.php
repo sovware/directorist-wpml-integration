@@ -13,10 +13,20 @@ class Filter_Permalinks {
      * @return void
      */
     public function __construct() {
+        /**
+         * Enable Directorist URL and language-switcher filtering.
+         *
+         * @param bool $enabled Whether permalink filtering should run.
+         */
+        if ( ! apply_filters( 'directorist_wpml_enable_permalink_filtering', true ) ) {
+            return;
+        }
+
         add_filter( 'wpml_ls_language_url', [ $this, 'filter_lang_switcher_url_for_generic_pages' ], 20, 2 );
         add_filter( 'wpml_ls_language_url', [ $this, 'filter_lang_switcher_url_for_archive_pages' ], 20, 2 );
         add_filter( 'wpml_ls_language_url', [ $this, 'filter_lang_switcher_url_for_author_profile_page' ], 20, 2 );
         add_filter( 'wpml_ls_language_url', [ $this, 'filter_lang_switcher_url_for_single_taxonomy_page' ], 20, 2 );
+        add_filter( 'wpml_alternate_hreflang', [ $this, 'filter_taxonomy_hreflang_url' ], 20, 2 );
         
         add_filter( 'atbdp_checkout_page_url', [ $this, 'filter_checkout_page_url' ], 20, 3 );
         add_filter( 'atbdp_payment_receipt_page_url', [ $this, 'filter_payment_receipt_page_url' ], 20, 3 );
@@ -221,36 +231,41 @@ class Filter_Permalinks {
      * @return string Link
      */
     public function filter_single_taxonomy_page_url( $args = [] ) {
+        $link = isset( $args['link'] ) ? $args['link'] : '';
+        $term = isset( $args['term'] ) ? $args['term'] : null;
 
-        $link           = ( isset( $args['link'] ) ) ? $args['link'] : '';
-        $term           = ( isset( $args['term'] ) ) ? $args['term'] : null;
-        $page_id        = ( isset( $args['page_id'] ) ) ? $args['page_id'] : 0;
-        $directory_type = ( isset( $args['directory_type'] ) ) ? $args['directory_type'] : 0;
-        $query_arg_key  = ( isset( $args['query_arg_key'] ) ) ? $args['query_arg_key'] : '';
-
-        $link = get_permalink( $page_id );
-
-        if ( ! $page_id ) {
+        if ( empty( $args['page_id'] ) || empty( $args['query_arg_key'] ) || empty( $term->slug ) || is_wp_error( $term ) ) {
             return $link;
         }
 
-        if ( empty( $term ) || is_wp_error( $term ) ) {
+        $base_url = get_permalink( $args['page_id'] );
+        $pretty   = get_option( 'permalink_structure' );
+
+        // Preserve native pretty paths and archive URLs. Older Core versions
+        // append the term after the query string in WPML parameter mode.
+        if ( ! $base_url || ( $pretty && false === strpos( $base_url, '?' ) ) ) {
             return $link;
         }
 
-        if ( empty(  get_option( 'permalink_structure' ) ) ) {
-            return $link;
+        $query_key = $args['query_arg_key'];
+        if ( $pretty ) {
+            $legacy_link = user_trailingslashit( trailingslashit( $base_url ) . $term->slug );
+            $correct_url = \Directorist\Helper::join_slug_to_url( $base_url, $term->slug );
+        } else {
+            // Older Core versions use the filter name as the plain tag key.
+            $legacy_key  = 'atbdp_tag' === $query_key ? 'atbdp_single_tag' : $query_key;
+            $legacy_link = add_query_arg( $legacy_key, $term->slug, $base_url );
+            $correct_url = add_query_arg( $query_key, $term->slug, $base_url );
         }
 
-        if ( ! empty( $query_arg_key ) ) {
-            $link = add_query_arg( $query_arg_key, $term->slug, $link );
+        if ( ! empty( $args['directory_type'] ) && 'all' !== $args['directory_type'] ) {
+            $legacy_link .= '?directory_type=' . $args['directory_type'];
+            $correct_url  = add_query_arg( 'directory_type', $args['directory_type'], $correct_url );
         }
 
-        if ( ! empty( $directory_type ) && 'all' != $directory_type ) {
-            $link = add_query_arg( 'directory_type', $directory_type, $link );
-        }
-
-        return $link;
+        // Repair only the known Core output, retaining links supplied by other
+        // permalink implementations and versions that already build valid URLs.
+        return $link === $legacy_link ? $correct_url : $link;
     }
 
     /**
@@ -263,7 +278,10 @@ class Filter_Permalinks {
      */
     public function filter_lang_switcher_url_for_generic_pages( $url = '', $data = [] ) {
         if ( ! empty( $_REQUEST ) ) {
-            $url = add_query_arg( $_REQUEST, $url );
+            $query_args = $_REQUEST;
+            // WPML supplies the target page and language in the incoming URL.
+            unset( $query_args['lang'], $query_args['page_id'], $query_args['p'], $query_args['pagename'], $query_args['name'] );
+            $url = add_query_arg( $query_args, $url );
         }
 
         // Pagination
@@ -311,10 +329,6 @@ class Filter_Permalinks {
 
         if ( ! $is_archive_page ) {
             return $url;
-        }
-
-        if ( ! empty( $_REQUEST ) ) {
-            $url = add_query_arg( $_REQUEST, $url );
         }
 
         // Pagination
@@ -390,13 +404,26 @@ class Filter_Permalinks {
 
         $taxonomy_data = $this->get_current_page_taxonomy_data();
 
-        if ( $taxonomy_data ) {
-            $lang = $data['tag'];
+        if ( $taxonomy_data && ! empty( $data['code'] ) ) {
+            $lang = $data['code'];
 
             return $this->get_formated_single_taxonomy_page_url( $url, $taxonomy_data, $lang );
         }
 
         return $url;
+    }
+
+    /**
+     * Keep the translated term in taxonomy-page alternate URLs.
+     *
+     * @param string $url  Translated base-page URL.
+     * @param string $lang Target language code.
+     * @return string
+     */
+    public function filter_taxonomy_hreflang_url( $url, $lang ) {
+        $taxonomy_data = $this->get_current_page_taxonomy_data();
+
+        return $taxonomy_data ? $this->get_formated_single_taxonomy_page_url( $url, $taxonomy_data, $lang ) : $url;
     }
     
     /**
@@ -455,46 +482,37 @@ class Filter_Permalinks {
      * @return string
      */
     public function get_formated_single_taxonomy_page_url( $url = '', $current_term_data = [], $lang = 'en' ) {
-        global $sitepress;
-
         $term_slug   = get_query_var( $current_term_data['query_var'] );
         $active_term = get_term_by( 'slug', $term_slug, $current_term_data['taxonomy'] );
 
-        if ( empty( $active_term ) ) {
+        if ( ! $active_term || is_wp_error( $active_term ) ) {
             return $url;
         }
 
-        $term_page_url_lang = $lang;
-        $translation_term_id = wpml_object_id_filter(
-            $active_term->term_id, 
-            $current_term_data['taxonomy'], 
-            false, 
-            $term_page_url_lang 
-        );
+        $term_id = apply_filters( 'wpml_object_id', $active_term->term_id, $current_term_data['taxonomy'], false, $lang );
+        // Read the requested translation without WPML adjusting it back to the
+        // current request language through the get_term filter.
+        $translated_term = $term_id ? \WP_Term::get_instance( (int) $term_id, $current_term_data['taxonomy'] ) : null;
 
-        remove_filter( 'get_term', array( $sitepress,'get_term_adjust_id'), 1, 1 );
-        $translation_term = get_term_by( 'id', $translation_term_id, $current_term_data['taxonomy'] );
-        add_filter('get_term', array( $sitepress,'get_term_adjust_id'), 1, 1 );
-        
-        if ( empty( $translation_term ) || is_wp_error( $translation_term ) ) {
+        if ( ! $translated_term || is_wp_error( $translated_term ) ) {
             return $url;
         }
 
-        $translation_term_slug = $translation_term->slug;
-        $page = atbdp_get_paged_num();
+        $url  = remove_query_arg( [ $current_term_data['query_var'], 'paged', 'page' ], $url );
+        $page = max( 1, (int) atbdp_get_paged_num() );
 
-        $url = add_query_arg( $current_term_data['query_var'], $translation_term_slug , $url );
+        if ( get_option( 'permalink_structure' ) ) {
+            $path = $translated_term->slug;
+            if ( $page > 1 ) {
+                $path .= '/page/' . $page;
+            }
 
-        if ( ! empty( $page ) ) {
-            $url = add_query_arg( 'paged', $page , $url );
+            return \Directorist\Helper::join_slug_to_url( $url, $path );
         }
 
-        if ( isset( $_REQUEST['directory_type'] ) ) {
-            $directory_type = sanitize_text_field( $_REQUEST['directory_type'] );
-            $url = add_query_arg( [ 'directory_type' => $directory_type ], $url );  
-        }
-        
-        return $url;
+        $url = add_query_arg( $current_term_data['query_var'], $translated_term->slug, $url );
+
+        return $page > 1 ? add_query_arg( 'paged', $page, $url ) : $url;
     }
 
     /**
